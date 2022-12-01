@@ -130,7 +130,7 @@ define('forum/register', [
 				if (results.every(obj => obj.status === 'rejected')) {
 					showSuccess(username_notify, successIcon);
 				} else {
-					showError(username_notify, '[[error:username-taken]]');
+					showWarning(username_notify, '[[error:pr-username-taken]]');
 				}
 
 				callback();
@@ -172,6 +172,16 @@ define('forum/register', [
 		} else {
 			showSuccess(password_confirm_notify, successIcon);
 		}
+	}
+
+	function showWarning(element, msg) {
+		translator.translate(msg, function (msg) {
+			element.html(msg);
+			element.parent()
+				.removeClass('register-success')
+				.addClass('register-danger');
+			element.show();
+		});
 	}
 
 	function showError(element, msg) {
