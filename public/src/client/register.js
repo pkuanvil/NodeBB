@@ -40,6 +40,7 @@ define('forum/register', [
 		const pr_feedback = $('#pr-feedback')
 		let pubkey_promise = api.get("/api/v3/plugins/pr_pubkey")
 		let pubkey_str = ""
+		let pr_placeholder = ""
 
 		handleLanguageOverride();
 
@@ -78,6 +79,20 @@ define('forum/register', [
 		}).catch(function (e) {
 			showError(pr_feedback, e)
 		})
+
+		function cleartext() {
+			if (pr_placeholder) {
+				pr_txt.text(pr_placeholder)
+			} else {
+				translator.translate('[[pr-txt-placeholder]]', function (translated) {
+					pr_placeholder = translated
+					pr_txt.text(pr_placeholder)
+				})
+			}
+		}
+		username.on('focus', cleartext)
+		password.on('focus', cleartext)
+		password_confirm.on('focus', cleartext)
 
 		pr_button.on('click', async function (e) {
 			e.preventDefault()

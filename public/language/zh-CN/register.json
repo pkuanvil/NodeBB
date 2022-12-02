@@ -1,6 +1,10 @@
 {
     "register": "注册",
     "cancel_registration": "取消注册",
+    "pr-button": "生成邮件验证信息",
+    "pr-message-1": "请使用本站认可的邮件地址（pku.edu.cn 或 stu.pku.edu.cn），将以下信息发送到邮件 ",
+    "pr-message-2": " ：",
+    "pr-txt-placeholder": "&lt;点击上方的按钮生成邮件验证信息&gt;",
     "help.email": "默认情况下，您的电子邮箱不会公开。",
     "help.username_restrictions": "全局唯一的用户名，长度 %1 到 %2 个字。其他人可以使用 @<span id='yourUsername'>用户名</span> 提及您。",
     "help.minimum_password_length": "您的密码长度必须不少于 %1 个字。",
