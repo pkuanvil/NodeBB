@@ -3,7 +3,7 @@
     "cancel_registration": "Cancel Registration",
     "pr-button": "Generate Email Verify Text",
     "pr-message-1": "Please use this site's recognized email address (pku.edu.cn or stu.pku.edu.cn) to send the following text to email ",
-    "pr-message-2": " :",
+    "pr-message-2": " . It is suggested that your verification email is sent in plain text mode, and the following text pasted in both subject and body of email: ",
     "pr-txt-placeholder": "&lt;Click above button to generate email verify text&gt;",
     "help.email": "By default, your email will be hidden from the public.",
     "help.username_restrictions": "A unique username between %1 and %2 characters. Others can mention you with @<span id='yourUsername'>username</span>.",
