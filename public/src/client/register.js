@@ -8,11 +8,38 @@ define('forum/register', [
 	let validationError = false;
 	const successIcon = '';
 
+	// https://gist.github.com/Deliaz/e89e9a014fea1ec47657d1aac3baa83c
+	// Note: no converting btoa() here
+	function ab2str(buffer) {
+		let binary = '';
+		let bytes = new Uint8Array(buffer);
+		let len = bytes.byteLength;
+		for (let i = 0; i < len; i++) {
+			binary += String.fromCharCode(bytes[i]);
+		}
+		return binary
+	}
+	// https://github.com/mdn/dom-examples/blob/main/web-crypto/import-key/spki.js
+	function str2ab(str) {
+		const buf = new ArrayBuffer(str.length);
+		const bufView = new Uint8Array(buf);
+		for (let i = 0, strLen = str.length; i < strLen; i++) {
+			bufView[i] = str.charCodeAt(i);
+		}
+		return buf;
+	}
+
 	Register.init = function () {
 		const username = $('#username');
 		const password = $('#password');
 		const password_confirm = $('#password-confirm');
 		const register = $('#register');
+		const pr_button = $('#pr-button')
+		const pr_email = $('#pr-email')
+		const pr_txt = $('#pr-txt')
+		const pr_feedback = $('#pr-feedback')
+		let pubkey_promise = api.get("/api/v3/plugins/pr_pubkey")
+		let pubkey_str = ""
 
 		handleLanguageOverride();
 
@@ -45,6 +72,36 @@ define('forum/register', [
 				validatePasswordConfirm(password.val(), password_confirm.val());
 			}
 		});
+
+		api.get("/api/v3/plugins/pr_register_email").then(function (emailstr) {
+			pr_email.text(emailstr)
+		}).catch(function (e) {
+			showError(pr_feedback, e)
+		})
+
+		pr_button.on('click', async function (e) {
+			e.preventDefault()
+			validationError = false
+			validatePassword(password.val(), password_confirm.val())
+			validatePasswordConfirm(password.val(), password_confirm.val())
+			validateUsername(username.val())
+			if (validationError) {
+				return
+			}
+			try {
+				const PREFIX = 'USeRnaMe\n'
+				const regreq = PREFIX + username.val() + '\n' + password.val()
+				if (!pubkey_str) {
+					pubkey_str = await pubkey_promise
+				}
+				const pubkey = await importRSAPublicKey(pubkey_str)
+				const regreq_enc = await crypto.subtle.encrypt({name: "RSA-OAEP"}, pubkey, str2ab(regreq))
+				const regreq_enc_base64 = btoa(ab2str(regreq_enc))
+				pr_txt.text(regreq_enc_base64)
+			} catch (e) {
+				showError(pr_feedback, e)
+			}
+		})
 
 		function validateForm(callback) {
 			validationError = false;
@@ -110,6 +167,20 @@ define('forum/register', [
 		// Set initial focus
 		$('#username').focus();
 	};
+
+	// Modified from https://github.com/mdn/dom-examples/blob/main/web-crypto/import-key/spki.js
+	async function importRSAPublicKey(pem) {
+		// Note: The newline in Header and Footer is mandatory for our PEM string
+		const pemHeader = "-----BEGIN PUBLIC KEY-----\n";
+		const pemFooter = "-----END PUBLIC KEY-----\n";
+		const pemContents = pem.substring(pemHeader.length, pem.length - pemFooter.length);
+		// base64 decode the string to get the binary data
+		const binaryDerString = window.atob(pemContents);
+		// convert from a binary string to an ArrayBuffer
+		const binaryDer = str2ab(binaryDerString);
+
+		return window.crypto.subtle.importKey("spki", binaryDer, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["encrypt"]);
+	}
 
 	function validateUsername(username, callback) {
 		callback = callback || function () {};
