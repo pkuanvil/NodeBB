@@ -447,7 +447,7 @@ authenticationController.localLogin = async function (req, username, password, n
 	}
 };
 
-const destroyAsync = util.promisify((req, callback) => req.session.destroy(callback));
+const regenerateAsync = util.promisify((req, callback) => req.session.regenerate(callback));
 const logoutAsync = util.promisify((req, callback) => req.logout(callback));
 
 authenticationController.logout = async function (req, res, next) {
@@ -462,8 +462,8 @@ authenticationController.logout = async function (req, res, next) {
 		await user.auth.revokeSession(sessionID, uid);
 		await logoutAsync(req);
 
-		await destroyAsync(req);
-		res.clearCookie(nconf.get('sessionKey'), meta.configs.cookie.get());
+		await regenerateAsync(req);
+		res.cookie(nconf.get('sessionKey'), req.session.cookie, meta.configs.cookie.get());
 
 		await user.setUserField(uid, 'lastonline', Date.now() - (meta.config.onlineCutoff * 60000));
 		await db.sortedSetAdd('users:online', Date.now() - (meta.config.onlineCutoff * 60000), uid);
