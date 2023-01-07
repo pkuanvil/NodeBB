@@ -66,6 +66,8 @@ module.exports = function (User) {
 		} else {
 			// Never allow password retrieval via this method
 			fields = fields.filter(value => value !== 'password');
+			// @pkuanvil: apply whitelist filter
+			fields = fields.filter(value => _.indexOf(results.whitelist, value) !== -1);
 		}
 
 		const users = await db.getObjectsFields(uniqueUids.map(uid => `user:${uid}`), fields);
