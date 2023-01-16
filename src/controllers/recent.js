@@ -53,7 +53,7 @@ recentController.getData = async function (req, url, sort) {
 		filter: filter,
 		term: term,
 		sort: sort,
-		floatPinned: req.query.pinned,
+		floatPinned: req.query.pinned !== undefined ? req.query.pinned : true,
 		query: req.query,
 	});
 
