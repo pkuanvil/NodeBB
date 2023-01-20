@@ -12,6 +12,7 @@ const user = require('../user');
 const logger = require('../logger');
 const plugins = require('../plugins');
 const ratelimit = require('../middleware/ratelimit');
+const groups = require('../groups');
 
 const Namespaces = Object.create(null);
 
@@ -187,8 +188,11 @@ async function checkMaintenance(socket) {
 	if (!meta.config.maintenanceMode) {
 		return;
 	}
-	const isAdmin = await user.isAdministrator(socket.uid);
-	if (isAdmin) {
+	const [isAdmin, isMemberOfExempt] = await Promise.all([
+		user.isAdministrator(socket.uid),
+		groups.isMemberOfAny(socket.uid, meta.config.groupsExemptFromMaintenanceMode),
+	]);
+	if (isAdmin || isMemberOfExempt) {
 		return;
 	}
 	const validator = require('validator');
