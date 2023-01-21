@@ -1,6 +1,7 @@
 'use strict';
 
 const qs = require('qs');
+const validator = require('validator');
 
 const plugins = require('../plugins');
 const meta = require('../meta');
@@ -15,8 +16,10 @@ async function getUserHomeRoute(uid) {
 	let route = adminHomePageRoute();
 
 	if (settings.homePageRoute !== 'undefined' && settings.homePageRoute !== 'none') {
-		route = (settings.homePageRoute || route).replace(/^\/+/, '');
+		route = settings.homePageRoute || route;
 	}
+	// @pkuanvil: unescape the route returned by user/settings.js::onSettingsLoaded()
+	route = validator.unescape(route).replace(/^\/+/, '');
 
 	return route;
 }
