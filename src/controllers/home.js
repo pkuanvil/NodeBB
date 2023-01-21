@@ -1,6 +1,6 @@
 'use strict';
 
-const url = require('url');
+const qs = require('qs');
 
 const plugins = require('../plugins');
 const meta = require('../meta');
@@ -31,8 +31,13 @@ async function rewrite(req, res, next) {
 	}
 
 	let parsedUrl;
+	let parsedUrlQuery;
 	try {
-		parsedUrl = url.parse(route, true);
+		// @pkuanvil: use WHATWG URL() api instead of the deprecated url.parse()
+		const basePlaceholder = 'https://example.org/';
+		parsedUrl = new URL(route, basePlaceholder);
+		// @pkuanvil: fix query string handling
+		parsedUrlQuery = qs.parse(parsedUrl.search.substring(1));
 	} catch (err) {
 		return next(err);
 	}
@@ -40,11 +45,12 @@ async function rewrite(req, res, next) {
 	const { pathname } = parsedUrl;
 	const hook = `action:homepage.get:${pathname}`;
 	if (!plugins.hooks.hasListeners(hook)) {
-		req.url = req.path + (!req.path.endsWith('/') ? '/' : '') + pathname;
+		// @pkuanvil: URL() pathname always starts with '/'
+		req.url = req.path + (!req.path.endsWith('/') ? '/' : '') + pathname.substring(1);
 	} else {
 		res.locals.homePageRoute = pathname;
 	}
-	req.query = Object.assign(parsedUrl.query, req.query);
+	req.query = Object.assign(parsedUrlQuery, req.query);
 
 	next();
 }
