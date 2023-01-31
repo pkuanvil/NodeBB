@@ -36,6 +36,9 @@ let sanitizeConfig = {
 	},
 };
 
+// @pkuanvil: add additional sanitizeHTML options
+let pr_sanitizeHTMLOptions = {};
+
 module.exports = function (Posts) {
 	Posts.urlRegex = {
 		regex: /href="([^"]+)"/g,
@@ -113,6 +116,8 @@ module.exports = function (Posts) {
 			allowedTags: sanitizeConfig.allowedTags,
 			allowedAttributes: sanitizeConfig.allowedAttributes,
 			allowedClasses: sanitizeConfig.allowedClasses,
+			// @pkuanvil: add additional sanitizeHTML options
+			...pr_sanitizeHTMLOptions,
 		});
 	};
 
@@ -127,6 +132,8 @@ module.exports = function (Posts) {
 
 		// Some plugins might need to adjust or whitelist their own tags...
 		sanitizeConfig = await plugins.hooks.fire('filter:sanitize.config', sanitizeConfig);
+		// @pkuanvil: add additional sanitizeHTML options
+		pr_sanitizeHTMLOptions = await plugins.hooks.fire('filter:pr_sanitizehtml.config', pr_sanitizeHTMLOptions);
 	};
 
 	Posts.registerHooks = () => {
