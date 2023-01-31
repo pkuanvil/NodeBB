@@ -38,10 +38,12 @@ module.exports = function (app, middleware, controllers) {
 	const multipartMiddleware = multipart();
 	const postMiddlewares = [
 		middleware.maintenanceMode,
+		// @pkuanvil: guard against possible tempfile leaks
+		// @pkuanvil: CSRF goes before multipartMiddleware
+		middleware.applyCSRF,
 		multipartMiddleware,
 		middleware.validateFiles,
 		middleware.uploads.ratelimit,
-		middleware.applyCSRF,
 	];
 
 	router.post('/post/upload', postMiddlewares, helpers.tryRoute(uploadsController.uploadPost));
