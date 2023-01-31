@@ -553,7 +553,9 @@ module.exports = function (utils, load, warn) {
 				}
 				return output;
 			}, function (err) {
-				warn('Translation failed: ' + err.stack);
+				// @pkuanvil: prefer console.trace() over err.stack; also show more verbose err
+				warn('Translation failed: ' + err);
+				console.trace();
 			});
 		},
 		translateKeys: async function (keys, language, callback) {
