@@ -219,12 +219,12 @@ authenticationController.registerComplete = async function (req, res) {
 };
 
 authenticationController.registerAbort = async function (req, res) {
+	await plugins.hooks.fire('action:pr_register.abort', { req });
 	if (req.uid) {
 		// Clear interstitial data and continue on...
 		delete req.session.registration;
 		res.redirect(nconf.get('relative_path') + (req.session.returnTo || '/'));
 	} else {
-		await plugins.hooks.fire('action:pr_register.abort', { req });
 		// End the session and redirect to home
 		req.session.destroy(() => {
 			res.clearCookie(nconf.get('sessionKey'), meta.configs.cookie.get());
