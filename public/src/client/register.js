@@ -84,7 +84,7 @@ define('forum/register', [
 			if (pr_placeholder) {
 				pr_txt.text(pr_placeholder);
 			} else {
-				translator.translate('[[register:pr-txt-placeholder]]', function (translated) {
+				translator.translate('[[persona:pr_register.txt-placeholder]]', function (translated) {
 					pr_placeholder = translated;
 					pr_txt.text(pr_placeholder);
 				});
