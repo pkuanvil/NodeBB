@@ -31,6 +31,11 @@ profileController.get = async function (req, res, next) {
 	if (!userData) {
 		return next();
 	}
+	// @pkuanvil: if a user don't have a post, hide the user's data
+	const hasPosts = userData.counts && userData.counts.posts && userData.counts.posts.length !== 0;
+	if (!hasPosts && !userData.isSelf && !await user.isAdminOrGlobalMod(req.uid)) {
+		return next();
+	}
 
 	await incrementProfileViews(req, userData);
 

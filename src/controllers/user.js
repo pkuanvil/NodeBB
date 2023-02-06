@@ -35,6 +35,11 @@ async function byType(type, req, res, next) {
 	if (!userData) {
 		return next();
 	}
+	// @pkuanvil: if a user don't have a post, hide the user's data
+	const hasPosts = userData.postcount !== 0;
+	if (!hasPosts && req.uid !== userData.uid && !await user.isAdminOrGlobalMod(req.uid)) {
+		return next();
+	}
 	res.json(userData);
 }
 
