@@ -66,6 +66,7 @@ privsAdmin.routeMap = {
 	uploadDefaultAvatar: 'admin:settings',
 };
 privsAdmin.routePrefixMap = {
+	'dashboard/': 'admin:dashboard',
 	'manage/categories/': 'admin:categories',
 	'manage/privileges/': 'admin:privileges',
 	'manage/groups/': 'admin:groups',
@@ -209,4 +210,9 @@ privsAdmin.userPrivileges = async function (uid) {
 privsAdmin.groupPrivileges = async function (groupName) {
 	const groupPrivilegeList = await privsAdmin.getGroupPrivilegeList();
 	return await helpers.userOrGroupPrivileges(0, groupName, groupPrivilegeList);
+};
+
+privsAdmin.getUidsWithPrivilege = async function (privilege) {
+	const uidsByCid = await helpers.getUidsWithPrivilege([0], privilege);
+	return uidsByCid[0];
 };
