@@ -197,8 +197,13 @@ module.exports = function (middleware) {
 		if (uid <= 0) {
 			return next();
 		}
-		const userslug = await user.getUserField(uid, 'userslug');
+		// @pkuanvil: if a user don't have a post, hide the user's data
+		const { userslug, postcount } = await user.getUserFields(uid, ['userslug', 'postcount']);
+		const isSelf = uid === req.uid;
 		if (!userslug) {
+			return next();
+		}
+		if (!postcount && !isSelf && !await user.isAdminOrGlobalMod(req.uid)) {
 			return next();
 		}
 		const path = req.url.replace(/^\/api/, '')
