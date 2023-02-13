@@ -1,7 +1,7 @@
 {
 	"authentication": "验证",
 	"email-confirm-interval": "用户无法重新发送电子邮箱激活直到",
-	"email-confirm-interval2": "minutes have elapsed",
+	"email-confirm-interval2": "已过去的分钟数",
 	"allow-login-with": "允许使用何种登录名",
 	"allow-login-with.username-email": "用户名或者邮箱",
 	"allow-login-with.username": "仅限用户名",
@@ -69,7 +69,7 @@
 	"digest-freq.off": "关闭",
 	"digest-freq.daily": "每日",
 	"digest-freq.weekly": "每周",
-	"digest-freq.biweekly": "Bi-Weekly",
+	"digest-freq.biweekly": "两周",
 	"digest-freq.monthly": "每月",
 	"email-chat-notifs": "当我不在线并收到新的聊天消息时，给我发送邮件通知",
 	"email-post-notif": "当我订阅的主题有新回复时，给我发送邮件通知",
