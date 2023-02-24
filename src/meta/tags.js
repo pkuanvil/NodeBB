@@ -19,9 +19,12 @@ Tags.parse = async (req, data, meta, link) => {
 		name: 'viewport',
 		content: 'width=device-width, initial-scale=1.0',
 	}, {
-		name: 'content-type',
-		content: 'text/html; charset=UTF-8',
-		noEscape: true,
+		// @pkuanvil: Fix invalid charset <meta> tag
+		// Setting 'name' to 'charset' is NOT valid in HTML Standard. The valid tag are either one of:
+		// * 'http-equiv: content-type' (which MUST have 'content' being 'text/html; charset=utf-8')
+		// * 'charset' (which MUST have a value of case-insensitive match of 'utf-8')
+		// We simply pick 'charset' here because it is simpler
+		charset: 'utf-8',
 	}, {
 		name: 'apple-mobile-web-app-capable',
 		content: 'yes',
@@ -149,7 +152,7 @@ Tags.parse = async (req, data, meta, link) => {
 	});
 
 	meta = results.tags.tags.concat(meta || []).map((tag) => {
-		if (!tag || typeof tag.content !== 'string') {
+		if (!tag || (typeof tag.content !== 'string' && typeof tag.charset !== 'string')) {
 			winston.warn('Invalid meta tag. ', tag);
 			return tag;
 		}
