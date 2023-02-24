@@ -54,10 +54,13 @@ module.exports = function (utils, Benchpress, relative_path) {
 
 	function buildMetaTag(tag) {
 		const name = tag.name ? 'name="' + tag.name + '" ' : '';
+		// @pkuanvil: add support for http-equiv and charset in <meta> tags
+		const http_equiv = tag['http-equiv'] ? 'http-equiv="' + tag['http-equiv'] + '" ' : '';
+		const charset = tag.charset ? 'charset="' + tag.charset + '" ' : '';
 		const property = tag.property ? 'property="' + tag.property + '" ' : '';
 		const content = tag.content ? 'content="' + tag.content.replace(/\n/g, ' ') + '" ' : '';
 
-		return '<meta ' + name + property + content + '/>\n\t';
+		return '<meta ' + name + http_equiv + charset + property + content + '/>\n\t';
 	}
 
 	function buildLinkTag(tag) {
