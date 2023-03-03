@@ -37,7 +37,8 @@ middleware.regexes = {
 const csrfMiddleware = csrf();
 
 middleware.applyCSRF = function (req, res, next) {
-	if (req.uid >= 0) {
+	// @pkuanvil: ignore CSRF for guest. CSRF is known to cause problems on /register
+	if (req.uid > 0) {
 		csrfMiddleware(req, res, next);
 	} else {
 		next();
