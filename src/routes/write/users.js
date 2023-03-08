@@ -18,6 +18,8 @@ function authenticatedRoutes() {
 	setupApiRoute(router, 'post', '/', [...middlewares, middleware.checkRequired.bind(null, ['username'])], controllers.write.users.create);
 	setupApiRoute(router, 'delete', '/', [...middlewares, middleware.checkRequired.bind(null, ['uids'])], controllers.write.users.deleteMany);
 
+	// @pkuanvil: work around for gcore CDN by adding matching GET for HEAD routes.
+	setupApiRoute(router, 'get', '/:uid', [middleware.assert.user], controllers.write.users.exists);
 	setupApiRoute(router, 'head', '/:uid', [middleware.assert.user], controllers.write.users.exists);
 	setupApiRoute(router, 'get', '/:uid', [...middlewares, middleware.assert.user], controllers.write.users.get);
 	setupApiRoute(router, 'put', '/:uid', [...middlewares, middleware.assert.user], controllers.write.users.update);
