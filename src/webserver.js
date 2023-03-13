@@ -13,6 +13,7 @@ const app = express();
 app.renderAsync = util.promisify((tpl, data, callback) => app.render(tpl, data, callback));
 let server;
 const winston = require('winston');
+const responseTime = require('response-time');
 const flash = require('connect-flash');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
@@ -119,6 +120,8 @@ function setupExpressApp(app) {
 	const relativePath = nconf.get('relative_path');
 	const viewsDir = nconf.get('views_dir');
 
+	// @pkuanvil: add respose time
+	app.use(responseTime());
 	app.engine('tpl', (filepath, data, next) => {
 		filepath = filepath.replace(/\.tpl$/, '.js');
 
