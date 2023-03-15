@@ -10,19 +10,6 @@ const helpers = require('./helpers');
 const plugins = require('../plugins');
 
 module.exports = function (middleware) {
-	// @pkuanvil: reasonably lock down CSP
-	function getCSPHeaders() {
-		// We don't want to restrict img-src and media-src
-		// Can't restrict connect-src now because chromium use this to restrict img and media
-		// No default-src for now
-		const csp = `; \
-child-src 'self'; object-src 'none'; \
-script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; \
-manifest-src 'self';\
-`;
-		return csp;
-	}
-
 	middleware.addHeaders = helpers.try((req, res, next) => {
 		const headers = {
 			'X-Powered-By': encodeURI(meta.config['powered-by'] || 'NodeBB'),
@@ -39,8 +26,6 @@ manifest-src 'self';\
 			headers['Content-Security-Policy'] = 'frame-ancestors \'self\'';
 			headers['X-Frame-Options'] = 'SAMEORIGIN';
 		}
-		// @pkuanvil: reasonably lock down CSP
-		headers['Content-Security-Policy'] += getCSPHeaders(req);
 
 		if (meta.config['access-control-allow-origin']) {
 			let origins = meta.config['access-control-allow-origin'].split(',');
