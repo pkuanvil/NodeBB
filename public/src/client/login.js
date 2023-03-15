@@ -34,7 +34,12 @@ define('forum/login', ['hooks', 'translator', 'jquery-form'], function (hooks, t
 					beforeSend: function () {
 						app.flags._login = true;
 					},
-					success: function (data) {
+					// @pkuanvil: handle captcha redirect
+					success: function (data, textStatus, xhr) {
+						if (xhr.getResponseHeader('X-Redirect')) {
+							window.location.href = data;
+							return;
+						}
 						hooks.fire('action:app.loggedIn', data);
 						const pathname = utils.urlToLocation(data.next).pathname;
 						const params = utils.params({ url: data.next });
