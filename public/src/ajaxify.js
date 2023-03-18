@@ -438,8 +438,9 @@ ajaxify.widgets = { render: render };
 
 	ajaxify.loadTemplate = function (template, callback) {
 		$.ajax({
-			url: `${config.asset_base_url}/templates/${template}.js`,
-			cache: false,
+			// @pkuanvil: allow template to be cached with cacheBuster query
+			url: `${config.asset_base_url}/templates/${template}.js?${app.cacheBuster}`,
+			cache: true,
 			dataType: 'text',
 			success: function (script) {
 				// eslint-disable-next-line no-new-func
