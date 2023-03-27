@@ -2,7 +2,7 @@
     "name": "nodebb",
     "license": "GPL-3.0",
     "description": "NodeBB Forum",
-    "version": "2.8.9",
+    "version": "2.8.10",
     "homepage": "http://www.nodebb.org",
     "repository": {
         "type": "git",
@@ -90,7 +90,7 @@
         "@nodebb/bootswatch": "3.4.2",
         "nconf": "0.12.0",
         "nodebb-plugin-2factor": "5.1.2",
-        "nodebb-plugin-composer-default": "9.2.4",
+        "nodebb-plugin-composer-default": "9.2.5",
         "nodebb-plugin-dbsearch": "5.1.5",
         "nodebb-plugin-markdown": "10.1.1",
         "nodebb-plugin-mentions": "3.0.12",
