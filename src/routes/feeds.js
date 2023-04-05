@@ -402,20 +402,23 @@ async function generateForTag(req, res) {
 	if (meta.config['feeds:disableRSS']) {
 		return controllers404.handle404(req, res);
 	}
+	// @pkuanvil: correctly set unescaped original tag
+	// See src/controllers/tags.js::getTag() for tag sanitizer in route /tags/:tag
 	const tag = validator.escape(String(req.params.tag));
+	const unescapedTag = utils.cleanUpTag(validator.unescape(tag), meta.config.maximumTagLength);
 	const page = parseInt(req.query.page, 10) || 1;
 	const topicsPerPage = meta.config.topicsPerPage || 20;
 	const start = Math.max(0, (page - 1) * topicsPerPage);
 	const stop = start + topicsPerPage - 1;
 	await sendTopicsFeed({
 		uid: req.uid,
-		title: `Topics tagged with ${tag}`,
-		description: `A list of topics that have been tagged with ${tag}`,
+		title: `Topics tagged with ${unescapedTag}`,
+		description: `A list of topics that have been tagged with ${unescapedTag}`,
 		feed_url: `/tags/${tag}.rss`,
 		site_url: `/tags/${tag}`,
 		start: start,
 		stop: stop,
-	}, `tag:${tag}:topics`, res);
+	}, `tag:${unescapedTag}:topics`, res);
 }
 
 function sendFeed(feed, res) {
