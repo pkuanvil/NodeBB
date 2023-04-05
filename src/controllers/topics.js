@@ -251,14 +251,6 @@ async function addTags(topicData, req, res) {
 		},
 	];
 
-	if (!topicData['feeds:disableRSS']) {
-		res.locals.linkTags.push({
-			rel: 'alternate',
-			type: 'application/rss+xml',
-			href: topicData.rssFeedUrl,
-		});
-	}
-
 	if (topicData.category) {
 		res.locals.linkTags.push({
 			rel: 'up',

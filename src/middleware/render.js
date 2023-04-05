@@ -33,6 +33,14 @@ module.exports = function (middleware) {
 				options.template = { name: template, [template]: true };
 				options.url = (req.baseUrl + req.path.replace(/^\/api/, ''));
 				options.bodyClass = helpers.buildBodyClass(req, res, options);
+				// @pkuanvil: correctly append RSS link tag for all pages that have rssFeedUrl
+				if (!meta.config['feeds:disableRSS'] && options.hasOwnProperty('rssFeedUrl')) {
+					res.locals.linkTags.push({
+						rel: 'alternate',
+						type: 'application/rss+xml',
+						href: options.rssFeedUrl,
+					});
+				}
 
 				if (req.loggedIn) {
 					res.set('cache-control', 'private');
