@@ -280,11 +280,18 @@ async function generateTopicsFeed(feedOptions, feedTopics, timestampField) {
 			return;
 		}
 
-		if (topicData.teaser && topicData.teaser.user && !feedOptions.useMainPost) {
-			feedItem.description = topicData.teaser.content;
-			feedItem.author = topicData.teaser.user.username;
-			feed.item(feedItem);
-			return;
+		// @pkuanvil: only use teaserPid, but don't directly use teaser content here,
+		// since RSS feed usually want full content and also want HTML
+		if (topicData.teaserPid) {
+			let postData = await posts.getPostsByPids([topicData.teaserPid], feedOptions.uid);
+			postData = await user.blocks.filter(feedOptions.uid, postData);
+			await topics.addPostData(postData, feedOptions.uid);
+			if (postData.length > 0) {
+				feedItem.description = postData[0].content;
+				feedItem.author = postData[0].user.username;
+				feed.item(feedItem);
+				return;
+			}
 		}
 
 		const mainPost = await topics.getMainPost(topicData.tid, feedOptions.uid);
