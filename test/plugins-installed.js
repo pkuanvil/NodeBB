@@ -5,9 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./mocks/databasemock');
 
-const active = nconf.get('test_plugins') || [];
-const toTest = fs.readdirSync(path.join(__dirname, '../node_modules'))
-	.filter(p => p.startsWith('nodebb-') && active.includes(p));
+// @pkuanvil: don't do any search in ../node_modules for test_plugins, just use plugin name
+const toTest = nconf.get('test_plugins') || [];
 
 describe('Installed Plugins', () => {
 	toTest.forEach((plugin) => {
