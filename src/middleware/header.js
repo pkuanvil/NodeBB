@@ -66,6 +66,9 @@ middleware.renderHeader = async function renderHeader(req, res, data) {
 		'brand:logo:url': meta.config['brand:logo:url'] || '',
 		'brand:logo:alt': meta.config['brand:logo:alt'] || '',
 		'brand:logo:display': meta.config['brand:logo'] ? '' : 'hide',
+		// @pkuanvil: expose brand:logo:height and brand:logo:width
+		'brand:logo:height': meta.config['brand:logo:height'] || '',
+		'brand:logo:width': meta.config['brand:logo:width'] || '',
 		allowRegistration: registrationType === 'normal',
 		searchEnabled: plugins.hooks.hasListeners('filter:search.query'),
 		postQueueEnabled: !!meta.config.postQueue,
