@@ -39,11 +39,15 @@ settingsController.get = async function (req, res, next) {
 		uid: req.uid,
 	});
 
+	// @pkuanvil: add site-wide defaults here
+	const pr_globalDefaults = await plugins.hooks.fire('filter:pr_user.globalDefaults', {});
+
 	const [notificationSettings, routes] = await Promise.all([
 		getNotificationSettings(userData),
 		getHomePageRoutes(userData),
 	]);
 
+	userData.pr_globalDefaults = pr_globalDefaults;
 	userData.customSettings = data.customSettings;
 	userData.homePageRoutes = routes;
 	userData.notificationSettings = notificationSettings;
