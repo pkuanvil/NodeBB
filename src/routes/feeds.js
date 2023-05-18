@@ -82,9 +82,11 @@ async function generateForTopic(req, res, next) {
 
 		topics.modifyPostsByPrivilege(topicData, userPrivileges);
 
+		// @pkuanvil: don't include all content in main feed description
+		const title = utils.stripHTMLTags(topicData.title, utils.tags);
 		const feed = new rss({
-			title: utils.stripHTMLTags(topicData.title, utils.tags),
-			description: topicData.posts.length ? topicData.posts[0].content : '',
+			title,
+			description: `#${tid} ${title}`,
 			feed_url: `${nconf.get('url')}/topic/${tid}.rss`,
 			site_url: `${nconf.get('url')}/topic/${topicData.slug}`,
 			image_url: topicData.posts.length ? topicData.posts[0].picture : '',
@@ -95,7 +97,8 @@ async function generateForTopic(req, res, next) {
 		if (topicData.posts.length > 0) {
 			feed.pubDate = new Date(parseInt(topicData.posts[0].timestamp, 10)).toUTCString();
 		}
-		const replies = topicData.posts.slice(1);
+		// @pkuanvil: add all posts to feed item, including the main post
+		const replies = topicData.posts;
 		replies.forEach((postData) => {
 			if (!postData.deleted) {
 				const dateStamp = new Date(
