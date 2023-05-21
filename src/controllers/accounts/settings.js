@@ -40,7 +40,9 @@ settingsController.get = async function (req, res, next) {
 	});
 
 	// @pkuanvil: add site-wide defaults here
-	const pr_globalDefaults = await plugins.hooks.fire('filter:pr_user.globalDefaults', {});
+	const pr_globalDefaults = await plugins.hooks.fire('filter:pr_user.globalDefaults', {
+		disableEmailSubscriptions: meta.config.disableEmailSubscriptions,
+	});
 
 	const [notificationSettings, routes] = await Promise.all([
 		getNotificationSettings(userData),
