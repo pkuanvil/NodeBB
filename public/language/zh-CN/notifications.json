@@ -53,6 +53,7 @@
      "post-queue-notify": "您先前提交的帖子收到了通知：<br/>“%1”",
     "email-confirmed": "电子邮箱已确认",
     "email-confirmed-message": "感谢您验证您的电子邮箱。您的帐户现已完全激活。",
+    "pr-email-confirmed-message": "感谢您验证您的电子邮箱。您现在可以在“忘记密码”处输入您的邮箱以重设密码。",
     "email-confirm-error-message": "验证的您电子邮箱地址时出现了问题。可能是因为验证码无效或已过期。",
     "email-confirm-sent": "确认邮件已发送。",
     "none": "无",
