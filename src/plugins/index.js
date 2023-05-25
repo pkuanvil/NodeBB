@@ -122,6 +122,15 @@ Plugins.reload = async function () {
 		}
 		console.log('');
 	}
+	// @pkuanvil: add critical plugins check. If critical plugins are not loaded, abort NodeBB
+	const criticalPlugins = nconf.get('critical_plugins') || [];
+	const failedCritialPlugins = criticalPlugins.filter(id => !Plugins.libraries[id]);
+	if (failedCritialPlugins.length > 0) {
+		winston.error(`[plugins/load] Cannot load critical plugin${failedCritialPlugins.length === 1 ? '' : 's'}: ${failedCritialPlugins.join(',')}. NodeBB will abort.`);
+		require('../cli/running').stop();
+		// Sleep pretty long here
+		await new Promise((resolve) => { setTimeout(resolve, 60000); });
+	}
 
 	// Core hooks
 	posts.registerHooks();
