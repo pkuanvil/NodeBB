@@ -191,6 +191,7 @@ Flags.list = async function (data) {
 		query: data.query,
 	});
 	flagIds = await Flags.sort(flagIds, data.sort);
+	const count = flagIds.length;
 
 	// Create subset for parsing based on page number (n=20)
 	const flagsPerPage = Math.abs(parseInt(filters.perPage, 10) || 1);
@@ -223,6 +224,7 @@ Flags.list = async function (data) {
 
 	return {
 		flags: payload.flags,
+		count,
 		page: payload.page,
 		pageCount: pageCount,
 	};
@@ -678,6 +680,11 @@ Flags.update = async function (flagId, uid, changeset) {
 		return allowed;
 	};
 
+	async function rescindNotifications(match) {
+		const nids = await db.getSortedSetScan({ key: 'notifications', match: `${match}*` });
+		return notifications.rescind(nids);
+	}
+
 	// Retrieve existing flag data to compare for history-saving/reference purposes
 	const tasks = [];
 	for (const prop of Object.keys(changeset)) {
@@ -690,10 +697,10 @@ Flags.update = async function (flagId, uid, changeset) {
 				tasks.push(db.sortedSetAdd(`flags:byState:${changeset[prop]}`, now, flagId));
 				tasks.push(db.sortedSetRemove(`flags:byState:${current[prop]}`, flagId));
 				if (changeset[prop] === 'resolved' && meta.config['flags:actionOnResolve'] === 'rescind') {
-					tasks.push(notifications.rescind(`flag:${current.type}:${current.targetId}`));
+					tasks.push(rescindNotifications(`flag:${current.type}:${current.targetId}`));
 				}
 				if (changeset[prop] === 'rejected' && meta.config['flags:actionOnReject'] === 'rescind') {
-					tasks.push(notifications.rescind(`flag:${current.type}:${current.targetId}`));
+					tasks.push(rescindNotifications(`flag:${current.type}:${current.targetId}`));
 				}
 			}
 		} else if (prop === 'assignee') {
@@ -768,6 +775,13 @@ Flags.getHistory = async function (flagId) {
 		};
 	});
 
+	// turn assignee uids into usernames
+	await Promise.all(history.map(async (entry) => {
+		if (entry.fields.hasOwnProperty('assignee')) {
+			entry.fields.assignee = await user.getUserField(entry.fields.assignee, 'username');
+		}
+	}));
+
 	// Append ban history and username change data
 	history = await mergeBanHistory(history, targetUid, uids);
 	history = await mergeMuteHistory(history, targetUid, uids);
@@ -835,7 +849,7 @@ Flags.notify = async function (flagObj, uid, notifySelf = false) {
 			bodyLong: await plugins.hooks.fire('filter:parse.raw', String(flagObj.description || '')),
 			pid: flagObj.targetId,
 			path: `/flags/${flagObj.flagId}`,
-			nid: `flag:post:${flagObj.targetId}`,
+			nid: `flag:post:${flagObj.targetId}:${uid}`,
 			from: uid,
 			mergeId: `notifications:user_flagged_post_in|${flagObj.targetId}`,
 			topicTitle: title,
@@ -848,7 +862,7 @@ Flags.notify = async function (flagObj, uid, notifySelf = false) {
 			bodyShort: `[[notifications:user_flagged_user, ${displayname}, ${targetDisplayname}]]`,
 			bodyLong: await plugins.hooks.fire('filter:parse.raw', String(flagObj.description || '')),
 			path: `/flags/${flagObj.flagId}`,
-			nid: `flag:user:${flagObj.targetId}`,
+			nid: `flag:user:${flagObj.targetId}:${uid}`,
 			from: uid,
 			mergeId: `notifications:user_flagged_user|${flagObj.targetId}`,
 		});

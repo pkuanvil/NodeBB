@@ -60,8 +60,9 @@ categoriesController.getAll = async function (req, res) {
 	}
 
 	const fields = [
-		'cid', 'name', 'icon', 'parentCid', 'disabled', 'link', 'order',
-		'color', 'bgColor', 'backgroundImage', 'imageClass', 'subCategoriesPerPage',
+		'cid', 'name', 'icon', 'parentCid', 'disabled', 'link',
+		'order', 'color', 'bgColor', 'backgroundImage', 'imageClass',
+		'subCategoriesPerPage', 'description',
 	];
 	const categoriesData = await categories.getCategoriesFields(cids, fields);
 	const result = await plugins.hooks.fire('filter:admin.categories.get', { categories: categoriesData, fields: fields });
@@ -101,6 +102,7 @@ categoriesController.getAll = async function (req, res) {
 		breadcrumbs: crumbs,
 		pagination: pagination.create(page, pageCount, req.query),
 		categoriesPerPage: meta.config.categoriesPerPage,
+		selectCategoryLabel: '[[admin/manage/categories:jump-to]]',
 	});
 };
 
@@ -132,12 +134,14 @@ async function buildBreadcrumbs(categoryData, url) {
 categoriesController.buildBreadCrumbs = buildBreadcrumbs;
 
 categoriesController.getAnalytics = async function (req, res) {
-	const [name, analyticsData] = await Promise.all([
+	const [name, analyticsData, selectedData] = await Promise.all([
 		categories.getCategoryField(req.params.category_id, 'name'),
 		analytics.getCategoryAnalytics(req.params.category_id),
+		helpers.getSelectedCategory(req.params.category_id),
 	]);
 	res.render('admin/manage/category-analytics', {
 		name: name,
 		analytics: analyticsData,
+		selectedCategory: selectedData.selectedCategory,
 	});
 };

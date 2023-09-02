@@ -1,22 +1,31 @@
 'use strict';
 
 
-define('forum/chats/recent', ['alerts'], function (alerts) {
+define('forum/chats/recent', ['alerts', 'api', 'chat'], function (alerts, api, chat) {
 	const recent = {};
 
 	recent.init = function () {
 		require(['forum/chats'], function (Chats) {
-			$('[component="chat/recent"]').on('click', '[component="chat/recent/room"]', function () {
-				Chats.switchChat($(this).attr('data-roomid'));
-			});
+			$('[component="chat/nav-wrapper"]')
+				.on('click', '[component="chat/recent/room"], [component="chat/public/room"]', function (e) {
+					e.stopPropagation();
+					e.preventDefault();
+					const roomId = this.getAttribute('data-roomid');
+					Chats.switchChat(roomId);
+				})
+				.on('click', '.mark-read', function (e) {
+					e.stopPropagation();
+					const chatEl = this.closest('[data-roomid]');
+					chat.toggleReadState(chatEl);
+				});
 
-			$('[component="chat/recent"]').on('scroll', function () {
+			$('[component="chat/recent"]').on('scroll', utils.debounce(function () {
 				const $this = $(this);
 				const bottom = ($this[0].scrollHeight - $this.height()) * 0.9;
 				if ($this.scrollTop() > bottom) {
 					loadMoreRecentChats();
 				}
-			});
+			}, 100));
 		});
 	};
 
@@ -49,7 +58,7 @@ define('forum/chats/recent', ['alerts'], function (alerts) {
 		if (!data.rooms.length) {
 			return callback();
 		}
-
+		data.loadingMore = true;
 		app.parseAndTranslate('chats', 'rooms', data, function (html) {
 			$('[component="chat/recent"]').append(html);
 			html.find('.timeago').timeago();

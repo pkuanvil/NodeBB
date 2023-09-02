@@ -14,6 +14,7 @@
 	"manage/users": "Uživatelé",
 	"manage/admins-mods": "Správci a moderátoři",
 	"manage/registration": "Registrační fronta",
+	"manage/flagged-content": "Flagged Content",
 	"manage/post-queue": "Fronta příspěvků",
 	"manage/groups": "Skupiny",
 	"manage/ip-blacklist": "Černá listina IP",
@@ -72,7 +73,9 @@
 	"development/info": "Informace",
 
 	"rebuild-and-restart-forum": "Znovu sestavit a restartovat fórum",
+	"rebuild-and-restart": "Rebuild & Restart",
 	"restart-forum": "Restartovat fórum",
+	"restart": "Restart",
 	"logout": "Odhlásit",
 	"view-forum": "Zobrazit fórum",
 

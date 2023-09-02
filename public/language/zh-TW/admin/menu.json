@@ -14,6 +14,7 @@
 	"manage/users": "使用者",
 	"manage/admins-mods": "權限分配",
 	"manage/registration": "註冊申請",
+	"manage/flagged-content": "Flagged Content",
 	"manage/post-queue": "貼文隊列",
 	"manage/groups": "群組",
 	"manage/ip-blacklist": "IP 黑名單",
@@ -72,7 +73,9 @@
 	"development/info": "資訊",
 
 	"rebuild-and-restart-forum": "部署並重啟論壇",
+	"rebuild-and-restart": "Rebuild & Restart",
 	"restart-forum": "重啟論壇",
+	"restart": "Restart",
 	"logout": "登出",
 	"view-forum": "檢視論壇",
 

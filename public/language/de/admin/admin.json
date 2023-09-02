@@ -7,5 +7,12 @@
 	"changes-saved": "Änderungen gespeichert",
 	"changes-saved-message": "Deine Änderungen an der NodeBB Konfiguration wurden gespeichert.",
 	"changes-not-saved": "Änderungen verworfen",
-	"changes-not-saved-message": "Beim Speichern der Änderungen ist ein Problem aufgetreten. (%1)"
+	"changes-not-saved-message": "Beim Speichern der Änderungen ist ein Problem aufgetreten. (%1)",
+	"save-changes": "Änderungen speichern",
+	"min": "Min:",
+	"max": "Max:",
+	"view": "Anzeigen",
+	"edit": "Bearbeiten",
+	"add": "Hinzufügen",
+	"select-icon": "Select Icon"
 }

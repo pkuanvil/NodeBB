@@ -1,4 +1,10 @@
 {
+	"manage-groups": "Gérer les groupes",
+	"add-group": "Ajouter un groupe",
+	"edit-group": "Éditer un groupe",
+	"back-to-groups": "Retour aux groupes",
+	"view-group": "Voir le groupe",
+	"icon-and-title": "Icône & titre",
 	"name": "Nom du groupe",
 	"badge": "Badge",
 	"properties": "Propriétées",
@@ -10,7 +16,7 @@
 	"edit": "Éditer",
 	"delete": "Supprimer",
 	"privileges": "Privilèges",
-	"download-csv": "CSV",
+	"members-csv": "Membres (CSV)",
 	"search-placeholder": "Rechercher",
 	"create": "Créer un groupe",
 	"description-placeholder": "Une courte description de votre groupe",
@@ -39,6 +45,5 @@
 	"revert": "Retour",
 
 	"edit.no-users-found": "Aucun utilisateur trouvé",
-	"edit.confirm-remove-user": "Êtes-vous sûr de vouloir retirer cet utilisateur ?",
-	"edit.save-success": "Changements sauvegardés !"
+	"edit.confirm-remove-user": "Êtes-vous sûr de vouloir retirer cet utilisateur ?"
 }

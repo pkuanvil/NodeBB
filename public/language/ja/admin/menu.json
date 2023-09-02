@@ -14,6 +14,7 @@
 	"manage/users": "ユーザー",
 	"manage/admins-mods": "Admins & Mods",
 	"manage/registration": "登録キュー",
+	"manage/flagged-content": "Flagged Content",
 	"manage/post-queue": "投稿キュー",
 	"manage/groups": "グループ",
 	"manage/ip-blacklist": "IPブラックリスト",
@@ -72,7 +73,9 @@
 	"development/info": "情報",
 
 	"rebuild-and-restart-forum": "Rebuild & Restart Forum",
+	"rebuild-and-restart": "Rebuild & Restart",
 	"restart-forum": "フォーラムを再開",
+	"restart": "Restart",
 	"logout": "ログアウト",
 	"view-forum": "フォーラムを表示",
 

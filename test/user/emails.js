@@ -130,9 +130,9 @@ describe('email confirmation (library methods)', () => {
 			await user.email.sendValidationEmail(uid, {
 				email,
 			});
-			await db.pexpire(`confirm:byUid:${uid}`, 1000);
+			const code = await db.get(`confirm:byUid:${uid}`);
+			await db.setObjectField(`confirm:${code}`, 'expires', Date.now() + 1000);
 			const ok = await user.email.canSendValidation(uid, email);
-
 			assert(ok);
 		});
 	});
@@ -150,7 +150,6 @@ describe('email confirmation (v3 api)', () => {
 			resolve({ jar, response, body });
 		});
 	});
-	const login = util.promisify(helpers.loginUser);
 
 	before(async () => {
 		// If you're running this file directly, uncomment these lines
@@ -219,7 +218,7 @@ describe('email confirmation (v3 api)', () => {
 	it('should still confirm the email (as email is set in user hash)', async () => {
 		await user.email.remove(userObj.uid);
 		await user.setUserField(userObj.uid, 'email', 'test@example.org');
-		({ jar } = await login('email-test', 'abcdef')); // email removal logs out everybody
+		({ jar } = await helpers.loginUser('email-test', 'abcdef')); // email removal logs out everybody
 		await groups.join('administrators', userObj.uid);
 
 		const { res, body } = await helpers.request('post', `/api/v3/users/${userObj.uid}/emails/${encodeURIComponent('test@example.org')}/confirm`, {

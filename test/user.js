@@ -15,7 +15,6 @@ const User = require('../src/user');
 const Topics = require('../src/topics');
 const Categories = require('../src/categories');
 const Posts = require('../src/posts');
-const Password = require('../src/password');
 const groups = require('../src/groups');
 const messaging = require('../src/messaging');
 const helpers = require('./helpers');
@@ -89,7 +88,7 @@ describe('User', () => {
 			const validationPending = await User.email.isValidationPending(uid, email);
 			assert.strictEqual(validationPending, true);
 
-			assert.equal(data.email, '&lt;h1&gt;test&lt;&#x2F;h1&gt;@gmail.com');
+			assert.equal(data.email, '');
 			assert.strictEqual(data.profileviews, 0);
 			assert.strictEqual(data.reputation, 0);
 			assert.strictEqual(data.postcount, 0);
@@ -575,7 +574,7 @@ describe('User', () => {
 			const socketModules = require('../src/socket.io/modules');
 			const uid1 = await User.create({ username: 'chatuserdelete1' });
 			const uid2 = await User.create({ username: 'chatuserdelete2' });
-			const roomId = await messaging.newRoom(uid1, [uid2]);
+			const roomId = await messaging.newRoom(uid1, { uids: [uid2] });
 			await messaging.addMessage({
 				uid: uid1,
 				content: 'hello',
@@ -584,106 +583,6 @@ describe('User', () => {
 			await messaging.leaveRoom([uid2], roomId);
 			await User.delete(1, uid1);
 			assert.strictEqual(await User.exists(uid1), false);
-		});
-	});
-
-	describe('passwordReset', () => {
-		let uid;
-		let code;
-		before(async () => {
-			uid = await User.create({ username: 'resetuser', password: '123456' });
-			await User.setUserField(uid, 'email', 'reset@me.com');
-			await User.email.confirmByUid(uid);
-		});
-
-		it('.generate() should generate a new reset code', (done) => {
-			User.reset.generate(uid, (err, _code) => {
-				assert.ifError(err);
-				assert(_code);
-
-				code = _code;
-				done();
-			});
-		});
-
-		it('.generate() should invalidate a previous generated reset code', async () => {
-			const _code = await User.reset.generate(uid);
-			const valid = await User.reset.validate(code);
-			assert.strictEqual(valid, false);
-
-			code = _code;
-		});
-
-		it('.validate() should ensure that this new code is valid', (done) => {
-			User.reset.validate(code, (err, valid) => {
-				assert.ifError(err);
-				assert.strictEqual(valid, true);
-				done();
-			});
-		});
-
-		it('.validate() should correctly identify an invalid code', (done) => {
-			User.reset.validate(`${code}abcdef`, (err, valid) => {
-				assert.ifError(err);
-				assert.strictEqual(valid, false);
-				done();
-			});
-		});
-
-		it('.send() should create a new reset code and reset password', async () => {
-			code = await User.reset.send('reset@me.com');
-		});
-
-		it('.commit() should update the user\'s password and confirm their email', (done) => {
-			User.reset.commit(code, 'newpassword', (err) => {
-				assert.ifError(err);
-
-				async.parallel({
-					userData: function (next) {
-						User.getUserData(uid, next);
-					},
-					password: function (next) {
-						db.getObjectField(`user:${uid}`, 'password', next);
-					},
-				}, (err, results) => {
-					assert.ifError(err);
-					Password.compare('newpassword', results.password, true, (err, match) => {
-						assert.ifError(err);
-						assert(match);
-						assert.strictEqual(results.userData['email:confirmed'], 1);
-						done();
-					});
-				});
-			});
-		});
-
-		it('.should error if same password is used for reset', async () => {
-			const uid = await User.create({ username: 'badmemory', email: 'bad@memory.com', password: '123456' });
-			const code = await User.reset.generate(uid);
-			let err;
-			try {
-				await User.reset.commit(code, '123456');
-			} catch (_err) {
-				err = _err;
-			}
-			assert.strictEqual(err.message, '[[error:reset-same-password]]');
-		});
-
-		it('should not validate email if password reset is due to expiry', async () => {
-			const uid = await User.create({ username: 'resetexpiry', email: 'reset@expiry.com', password: '123456' });
-			let confirmed = await User.getUserField(uid, 'email:confirmed');
-			let [verified, unverified] = await groups.isMemberOfGroups(uid, ['verified-users', 'unverified-users']);
-			assert.strictEqual(confirmed, 0);
-			assert.strictEqual(verified, false);
-			assert.strictEqual(unverified, true);
-			await User.setUserField(uid, 'passwordExpiry', Date.now());
-			const code = await User.reset.generate(uid);
-			await User.reset.commit(code, '654321');
-			confirmed = await User.getUserField(uid, 'email:confirmed');
-			[verified, unverified] = await groups.isMemberOfGroups(uid, ['verified-users', 'unverified-users']);
-			assert.strictEqual(confirmed, 0);
-			assert.strictEqual(verified, false);
-			assert.strictEqual(unverified, true);
 		});
 	});
 
@@ -1013,6 +912,23 @@ describe('User', () => {
 			}
 		});
 
+		it('should properly change username and clean up old sorted sets', async () => {
+			const uid = await User.create({ username: 'DennyO', password: '123456' });
+			let usernames = await db.getSortedSetRevRangeWithScores('username:uid', 0, -1);
+			usernames = usernames.filter(d => d.score === uid);
+			assert.deepStrictEqual(usernames, [{ value: 'DennyO', score: uid }]);
+
+			await apiUser.update({ uid: uid }, { uid: uid, username: 'DennyO\'s', password: '123456' });
+			usernames = await db.getSortedSetRevRangeWithScores('username:uid', 0, -1);
+			usernames = usernames.filter(d => d.score === uid);
+			assert.deepStrictEqual(usernames, [{ value: 'DennyO\'s', score: uid }]);
+
+			await apiUser.update({ uid: uid }, { uid: uid, username: 'Denny O', password: '123456' });
+			usernames = await db.getSortedSetRevRangeWithScores('username:uid', 0, -1);
+			usernames = usernames.filter(d => d.score === uid);
+			assert.deepStrictEqual(usernames, [{ value: 'Denny O', score: uid }]);
+		});
+
 		it('should send validation email', async () => {
 			const uid = await User.create({ username: 'pooremailupdate', email: 'poor@update.me', password: '123456' });
 			await User.email.expireValidation(uid);
@@ -1226,8 +1142,10 @@ describe('User', () => {
 					assert.ifError(err);
 					assert(data);
 					assert(Array.isArray(data));
-					assert.equal(data[0].type, 'uploaded');
-					assert.equal(data[0].text, '[[user:uploaded_picture]]');
+					assert.equal(data[0].type, 'default');
+					assert.equal(data[0].username, '[[user:default_picture]]');
+					assert.equal(data[1].type, 'uploaded');
+					assert.equal(data[1].username, '[[user:uploaded_picture]]');
 					done();
 				});
 			});
@@ -1311,10 +1229,13 @@ describe('User', () => {
 
 			// Accessing this page will mark the user's account as needing an updated email, below code undo's.
 			await requestAsync({
-				uri: `${nconf.get('url')}/register/abort?_csrf=${csrf_token}`,
+				uri: `${nconf.get('url')}/register/abort`,
 				jar,
 				method: 'POST',
 				simple: false,
+				headers: {
+					'x-csrf-token': csrf_token,
+				},
 			});
 		});
 
@@ -1586,21 +1507,39 @@ describe('User', () => {
 			], done);
 		});
 
-		it('should send digests', (done) => {
+		it('should send digests', async () => {
 			const oldValue = meta.config.includeUnverifiedEmails;
 			meta.config.includeUnverifiedEmails = true;
-			User.digest.execute({ interval: 'day' }, (err) => {
-				assert.ifError(err);
-				meta.config.includeUnverifiedEmails = oldValue;
-				done();
+			const uid = await User.create({ username: 'digest' });
+			await User.setUserField(uid, 'email', 'email@test.com');
+			await User.email.confirmByUid(uid);
+			await User.digest.execute({
+				interval: 'day',
+				subscribers: [uid],
 			});
+			meta.config.includeUnverifiedEmails = oldValue;
 		});
 
-		it('should not send digests', (done) => {
-			User.digest.execute({ interval: 'month' }, (err) => {
-				assert.ifError(err);
-				done();
-			});
+		it('should return 0', async () => {
+			const sent = await User.digest.send({ subscribers: [] });
+			assert.strictEqual(sent, 0);
+		});
+
+		it('should get users with single uid', async () => {
+			const res = await User.digest.getUsersInterval(1);
+			assert.strictEqual(res, false);
+		});
+
+		it('should not send digests', async () => {
+			const oldValue = meta.config.disableEmailSubsriptions;
+			meta.config.disableEmailSubsriptions = 1;
+			const res = await User.digest.execute({});
+			assert.strictEqual(res, false);
+			meta.config.disableEmailSubsriptions = oldValue;
+		});
+
+		it('should not send digests', async () => {
+			await User.digest.execute({ interval: 'month' });
 		});
 
 		it('should get delivery times', async () => {
@@ -2026,25 +1965,18 @@ describe('User', () => {
 			done();
 		});
 
-		it('should add user to approval queue', (done) => {
-			helpers.registerUser({
+		it('should add user to approval queue', async () => {
+			await helpers.registerUser({
 				username: 'rejectme',
 				password: '123456',
 				'password-confirm': '123456',
 				email: '<script>alert("ok")<script>reject@me.com',
 				gdpr_consent: true,
-			}, (err) => {
-				assert.ifError(err);
-				helpers.loginUser('admin', '123456', (err, data) => {
-					assert.ifError(err);
-					request(`${nconf.get('url')}/api/admin/manage/registration`, { jar: data.jar, json: true }, (err, res, body) => {
-						assert.ifError(err);
-						assert.equal(body.users[0].username, 'rejectme');
-						assert.equal(body.users[0].email, '&lt;script&gt;alert(&quot;ok&quot;)&lt;script&gt;reject@me.com');
-						done();
-					});
-				});
 			});
+			const { jar } = await helpers.loginUser('admin', '123456');
+			const { users } = await requestAsync(`${nconf.get('url')}/api/admin/manage/registration`, { jar, json: true });
+			assert.equal(users[0].username, 'rejectme');
+			assert.equal(users[0].email, '&lt;script&gt;alert(&quot;ok&quot;)&lt;script&gt;reject@me.com');
 		});
 
 		it('should fail to add user to queue if username is taken', (done) => {
@@ -2167,21 +2099,8 @@ describe('User', () => {
 			let csrf_token;
 			let jar;
 
-			before((done) => {
-				helpers.loginUser('notAnInviter', COMMON_PW, (err, data) => {
-					assert.ifError(err);
-					jar = data.jar;
-
-					request({
-						url: `${nconf.get('url')}/api/config`,
-						json: true,
-						jar: jar,
-					}, (err, response, body) => {
-						assert.ifError(err);
-						csrf_token = body.csrf_token;
-						done();
-					});
-				});
+			before(async () => {
+				({ jar, csrf_token } = await helpers.loginUser('notAnInviter', COMMON_PW));
 			});
 
 			it('should error if user does not have invite privilege', async () => {
@@ -2203,21 +2122,8 @@ describe('User', () => {
 			let csrf_token;
 			let jar;
 
-			before((done) => {
-				helpers.loginUser('inviter', COMMON_PW, (err, data) => {
-					assert.ifError(err);
-					jar = data.jar;
-
-					request({
-						url: `${nconf.get('url')}/api/config`,
-						json: true,
-						jar: jar,
-					}, (err, response, body) => {
-						assert.ifError(err);
-						csrf_token = body.csrf_token;
-						done();
-					});
-				});
+			before(async () => {
+				({ jar, csrf_token } = await helpers.loginUser('inviter', COMMON_PW));
 			});
 
 			it('should error with invalid data', async () => {
@@ -2271,7 +2177,7 @@ describe('User', () => {
 				assert.strictEqual(res.statusCode, 403);
 			});
 
-			it('should error if ouf of invitations', async () => {
+			it('should error if out of invitations', async () => {
 				meta.config.maximumInvites = 1;
 				const { res } = await helpers.invite({ emails: 'invite6@test.com', groupsToJoin: [] }, inviterUid, jar, csrf_token);
 				assert.strictEqual(res.statusCode, 403);
@@ -2305,21 +2211,8 @@ describe('User', () => {
 			let csrf_token;
 			let jar;
 
-			before((done) => {
-				helpers.loginUser('adminInvite', COMMON_PW, (err, data) => {
-					assert.ifError(err);
-					jar = data.jar;
-
-					request({
-						url: `${nconf.get('url')}/api/config`,
-						json: true,
-						jar: jar,
-					}, (err, response, body) => {
-						assert.ifError(err);
-						csrf_token = body.csrf_token;
-						done();
-					});
-				});
+			before(async () => {
+				({ jar, csrf_token } = await helpers.loginUser('adminInvite', COMMON_PW));
 			});
 
 			it('should escape email', async () => {
@@ -2456,21 +2349,8 @@ describe('User', () => {
 			let csrf_token;
 			let jar;
 
-			before((done) => {
-				helpers.loginUser('inviter', COMMON_PW, (err, data) => {
-					assert.ifError(err);
-					jar = data.jar;
-
-					request({
-						url: `${nconf.get('url')}/api/config`,
-						json: true,
-						jar: jar,
-					}, (err, response, body) => {
-						assert.ifError(err);
-						csrf_token = body.csrf_token;
-						done();
-					});
-				});
+			before(async () => {
+				({ jar, csrf_token } = await helpers.loginUser('inviter', COMMON_PW));
 			});
 
 			it('should show a list of groups for adding to an invite', async () => {
@@ -2494,14 +2374,7 @@ describe('User', () => {
 					resolveWithFullResponse: true,
 				});
 
-				assert.strictEqual(res.statusCode, 401);
-				assert.deepStrictEqual(res.body, {
-					status: {
-						code: 'not-authorised',
-						message: 'A valid login session was not found. Please log in and try again.',
-					},
-					response: {},
-				});
+				assert.strictEqual(res.statusCode, 403);
 			});
 		});
 	});
@@ -2659,6 +2532,7 @@ describe('User', () => {
 			await assertPrivacy({ v3Api: false, jar: regularUserJar, emailOnly: true });
 
 			// Let's confirm for afterwards
+			await User.setUserField(hidingUser.uid, 'email', 'should@be.hidden');
 			await User.email.confirmByUid(hidingUser.uid);
 		});
 
@@ -3049,17 +2923,12 @@ describe('User', () => {
 		});
 	});
 
-	it('should allow user to login even if password is weak', (done) => {
-		User.create({ username: 'weakpwd', password: '123456' }, (err) => {
-			assert.ifError(err);
-			const oldValue = meta.config.minimumPasswordStrength;
-			meta.config.minimumPasswordStrength = 3;
-			helpers.loginUser('weakpwd', '123456', (err) => {
-				assert.ifError(err);
-				meta.config.minimumPasswordStrength = oldValue;
-				done();
-			});
-		});
+	it('should allow user to login even if password is weak', async () => {
+		await User.create({ username: 'weakpwd', password: '123456' });
+		const oldValue = meta.config.minimumPasswordStrength;
+		meta.config.minimumPasswordStrength = 3;
+		await helpers.loginUser('weakpwd', '123456');
+		meta.config.minimumPasswordStrength = oldValue;
 	});
 
 	describe('User\'s', async () => {

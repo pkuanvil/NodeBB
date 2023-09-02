@@ -1,15 +1,37 @@
 'use strict';
 
 
-define('admin/appearance/skins', ['translator', 'alerts'], function (translator, alerts) {
+define('admin/appearance/skins', [
+	'translator', 'alerts', 'settings', 'hooks',
+], function (translator, alerts, settings, hooks) {
 	const Skins = {};
 
 	Skins.init = function () {
 		// Populate skins from Bootswatch API
 		$.ajax({
 			method: 'get',
-			url: 'https://bootswatch.com/api/3.json',
-		}).done(Skins.render);
+			url: 'https://bootswatch.com/api/5.json',
+		}).done((bsData) => {
+			hooks.on('action:settings.sorted-list.loaded', (data) => {
+				if (data.hash === 'custom-skins') {
+					// lower case all custom-skin ids after load
+					$('.custom-skin-settings [data-type="list"] [data-theme]').each((i, el) => {
+						$(el).attr('data-theme', $(el).attr('data-theme').toLowerCase());
+					});
+					highlightSelectedTheme(app.config.bootswatchSkin);
+				}
+			});
+			settings.load('custom-skins', $('.custom-skin-settings'));
+			Skins.render(bsData);
+		});
+
+		$('#save-custom-skins').on('click', function () {
+			settings.save('custom-skins', $('.custom-skin-settings'), function () {
+				alerts.success('[[admin/appearance/skins:save-custom-skins-success]]');
+			});
+			return false;
+		});
+
 
 		$('#skins').on('click', function (e) {
 			let target = $(e.target);
@@ -22,13 +44,12 @@ define('admin/appearance/skins', ['translator', 'alerts'], function (translator,
 
 			if (action && action === 'use') {
 				const parentEl = target.parents('[data-theme]');
-				const themeType = parentEl.attr('data-type');
 				const cssSrc = parentEl.attr('data-css');
 				const themeId = parentEl.attr('data-theme');
-
+				const themeName = parentEl.attr('data-theme-name');
 
 				socket.emit('admin.themes.set', {
-					type: themeType,
+					type: 'bootswatch',
 					id: themeId,
 					src: cssSrc,
 				}, function (err) {
@@ -41,7 +62,7 @@ define('admin/appearance/skins', ['translator', 'alerts'], function (translator,
 						alert_id: 'admin:theme',
 						type: 'info',
 						title: '[[admin/appearance/skins:skin-updated]]',
-						message: themeId ? ('[[admin/appearance/skins:applied-success, ' + themeId + ']]') : '[[admin/appearance/skins:revert-success]]',
+						message: themeId ? ('[[admin/appearance/skins:applied-success, ' + themeName + ']]') : '[[admin/appearance/skins:revert-success]]',
 						timeout: 5000,
 					});
 				});
@@ -56,7 +77,7 @@ define('admin/appearance/skins', ['translator', 'alerts'], function (translator,
 			themes: bootswatch.themes.map(function (theme) {
 				return {
 					type: 'bootswatch',
-					id: theme.name,
+					id: theme.name.toLowerCase(),
 					name: theme.name,
 					description: theme.description,
 					screenshot_url: theme.thumbnail,
@@ -69,13 +90,7 @@ define('admin/appearance/skins', ['translator', 'alerts'], function (translator,
 		}, function (html) {
 			themeContainer.html(html);
 
-			if (config['theme:src']) {
-				const skin = config['theme:src']
-					.match(/latest\/(\S+)\/bootstrap.min.css/)[1]
-					.replace(/(^|\s)([a-z])/g, function (m, p1, p2) { return p1 + p2.toUpperCase(); });
-
-				highlightSelectedTheme(skin);
-			}
+			highlightSelectedTheme(app.config.bootswatchSkin);
 		});
 	};
 

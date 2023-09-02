@@ -16,21 +16,29 @@ define('chat', [
 			module.center(chatModal);
 			module.focusInput(chatModal);
 		}
-
-		if (module.modalExists(roomId)) {
-			loadAndCenter(module.getModal(roomId));
-		} else {
-			api.get(`/chats/${roomId}`, {
-				uid: uid || app.user.uid,
-			}).then((roomData) => {
-				roomData.users = roomData.users.filter(function (user) {
-					return user && parseInt(user.uid, 10) !== parseInt(app.user.uid, 10);
-				});
-				roomData.uid = uid || app.user.uid;
-				roomData.isSelf = true;
-				module.createModal(roomData, loadAndCenter);
-			}).catch(alerts.error);
-		}
+		hooks.fire('filter:chat.openChat', {
+			modal: true,
+			roomId: roomId,
+			uid: uid,
+		}).then((hookData) => {
+			if (!hookData.modal) {
+				return ajaxify.go(`/chats/${roomId}`);
+			}
+			if (module.modalExists(roomId)) {
+				loadAndCenter(module.getModal(roomId));
+			} else {
+				api.get(`/chats/${roomId}`, {
+					uid: uid || app.user.uid,
+				}).then((roomData) => {
+					roomData.users = roomData.users.filter(function (user) {
+						return user && parseInt(user.uid, 10) !== parseInt(app.user.uid, 10);
+					});
+					roomData.uid = uid || app.user.uid;
+					roomData.isSelf = true;
+					module.createModal(roomData, loadAndCenter);
+				}).catch(alerts.error);
+			}
+		});
 	};
 
 	module.newChat = function (touid, callback) {
@@ -80,62 +88,111 @@ define('chat', [
 			if (err) {
 				return alerts.error(err);
 			}
-
-			const rooms = data.rooms.filter(function (room) {
-				return room.teaser;
+			const rooms = data.rooms.map((room) => {
+				if (room && room.teaser) {
+					room.teaser.timeagoLong = $.timeago(new Date(parseInt(room.teaser.timestamp, 10)));
+				}
+				return room;
 			});
 
-			translator.toggleTimeagoShorthand(function () {
-				for (let i = 0; i < rooms.length; i += 1) {
-					rooms[i].teaser.timeago = $.timeago(new Date(parseInt(rooms[i].teaser.timestamp, 10)));
-				}
-				translator.toggleTimeagoShorthand();
-				app.parseAndTranslate('partials/chats/dropdown', { rooms: rooms }, function (html) {
-					chatsListEl.find('*').not('.navigation-link').remove();
-					chatsListEl.prepend(html);
-					app.createUserTooltips(chatsListEl, 'right');
-					chatsListEl.off('click').on('click', '[data-roomid]', function (ev) {
-						if ($(ev.target).parents('.user-link').length) {
-							return;
-						}
-						const roomId = $(this).attr('data-roomid');
-						if (!ajaxify.currentPage.match(/^chats\//)) {
-							module.openChat(roomId);
-						} else {
-							ajaxify.go('user/' + app.user.userslug + '/chats/' + roomId);
-						}
-					});
+			translator.toggleTimeagoShorthand(async function () {
+				rooms.forEach((room) => {
+					if (room && room.teaser) {
+						room.teaser.timeago = $.timeago(new Date(parseInt(room.teaser.timestamp, 10)));
+						room.teaser.timeagoShort = room.teaser.timeago;
+					}
+				});
 
-					$('[component="chats/mark-all-read"]').off('click').on('click', function () {
-						socket.emit('modules.chats.markAllRead', function (err) {
-							if (err) {
-								return alerts.error(err);
-							}
+				translator.toggleTimeagoShorthand();
+				const html = await app.parseAndTranslate('partials/chats/dropdown', { rooms: rooms });
+				const listEl = chatsListEl.get(0);
+
+				chatsListEl.find('*').not('.navigation-link').remove();
+				chatsListEl.prepend(html);
+				chatsListEl.off('click').on('click', '[data-roomid]', function (ev) {
+					if (['.user-link', '.mark-read'].some(className => ev.target.closest(className))) {
+						return;
+					}
+					const roomId = $(this).attr('data-roomid');
+					if (!ajaxify.currentPage.match(/^chats\//)) {
+						module.openChat(roomId);
+					} else {
+						ajaxify.go('user/' + app.user.userslug + '/chats/' + roomId);
+					}
+				});
+
+				listEl.removeEventListener('click', onMarkReadClicked);
+				listEl.addEventListener('click', onMarkReadClicked);
+
+				$('[component="chats/mark-all-read"]').off('click').on('click', async function () {
+					await socket.emit('modules.chats.markAllRead');
+					if (ajaxify.data.template.chats) {
+						$('[component="chat/nav-wrapper"] [data-roomid]').each((i, el) => {
+							module.markChatElUnread($(el), false);
 						});
-					});
+					}
 				});
 			});
 		});
 	};
 
+	function onMarkReadClicked(e) {
+		const subselector = e.target.closest('.mark-read');
+		if (!subselector) {
+			return;
+		}
+
+		e.stopPropagation();
+		const chatEl = e.target.closest('[data-roomid]');
+		module.toggleReadState(chatEl);
+	}
+
+	module.toggleReadState = function (chatEl) {
+		const state = !chatEl.classList.contains('unread'); // this is the new state
+		const roomId = chatEl.getAttribute('data-roomid');
+		api[state ? 'put' : 'del'](`/chats/${roomId}/state`, {}).catch((err) => {
+			alerts.error(err);
+
+			// Revert on failure
+			module.markChatElUnread($(chatEl), !state);
+		});
+
+		// Immediate feedback
+		module.markChatElUnread($(chatEl), state);
+	};
+
+	module.isFromBlockedUser = function (fromUid) {
+		return app.user.blocks.includes(parseInt(fromUid, 10));
+	};
+
+	module.isLookingAtRoom = function (roomId) {
+		return ajaxify.data.template.chats && parseInt(ajaxify.data.roomId, 10) === parseInt(roomId, 10);
+	};
+
+	module.markChatElUnread = function (roomEl, unread) {
+		if (roomEl.length > 0) {
+			roomEl.toggleClass('unread', unread);
+			const markEl = roomEl.find('.mark-read');
+			if (markEl.length) {
+				markEl.find('.read').toggleClass('hidden', unread);
+				markEl.find('.unread').toggleClass('hidden', !unread);
+			}
+		}
+	};
 
 	module.onChatMessageReceived = function (data) {
-		const isSelf = data.self === 1;
-		data.message.self = data.self;
-
-		newMessage = data.self === 0;
+		if (app.user.blocks.includes(parseInt(data.fromUid, 10))) {
+			return;
+		}
 		if (module.modalExists(data.roomId)) {
+			data.self = parseInt(app.user.uid, 10) === parseInt(data.fromUid, 10) ? 1 : 0;
+			if (!newMessage) {
+				newMessage = data.self === 0;
+			}
+			data.message.self = data.self;
+			data.message.timestamp = Math.min(Date.now(), data.message.timestamp);
+			data.message.timestampISO = utils.toISOString(data.message.timestamp);
 			addMessageToModal(data);
-		} else if (!ajaxify.data.template.chats) {
-			api.get(`/chats/${data.roomId}`, {}).then((roomData) => {
-				roomData.users = roomData.users.filter(function (user) {
-					return user && parseInt(user.uid, 10) !== parseInt(app.user.uid, 10);
-				});
-				roomData.silent = true;
-				roomData.uid = app.user.uid;
-				roomData.isSelf = isSelf;
-				module.createModal(roomData);
-			}).catch(alerts.error);
 		}
 	};
 
@@ -146,13 +203,13 @@ define('chat', [
 		require(['forum/chats/messages'], function (ChatsMessages) {
 			// don't add if already added
 			if (!modal.find('[data-mid="' + data.message.messageId + '"]').length) {
-				ChatsMessages.appendChatMessage(modal.find('.chat-content'), data.message);
+				ChatsMessages.appendChatMessage(modal.find('[component="chat/message/content"]'), data.message);
 			}
 
 			if (modal.is(':visible')) {
 				taskbar.updateActive(modal.attr('data-uuid'));
-				if (ChatsMessages.isAtBottom(modal.find('.chat-content'))) {
-					ChatsMessages.scrollToBottom(modal.find('.chat-content'));
+				if (ChatsMessages.isAtBottom(modal.find('[component="chat/message/content"]'))) {
+					ChatsMessages.scrollToBottomAfterImageLoad(modal.find('[component="chat/message/content"]'));
 				}
 			} else if (!ajaxify.data.template.chats) {
 				module.toggleNew(modal.attr('data-uuid'), true, true);
@@ -175,9 +232,18 @@ define('chat', [
 	};
 
 	module.onRoomRename = function (data) {
-		const newTitle = $('<div></div>').html(data.newName).text();
 		const modal = module.getModal(data.roomId);
-		modal.find('[component="chat/room/name"]').text(newTitle);
+		const titleEl = modal.find('[component="chat/room/name"]');
+		const icon = titleEl.attr('data-icon');
+		if (titleEl.length) {
+			titleEl.html(
+				data.newName ?
+					`<i class="fa ${icon} text-muted"></i> ${data.newName}` :
+					data.chatWithMessage
+			);
+		}
+
+		const newTitle = $('<div></div>').html(data.newName).text();
 		taskbar.update('chat', modal.attr('data-uuid'), {
 			title: newTitle,
 		});
@@ -197,22 +263,24 @@ define('chat', [
 	module.createModal = function (data, callback) {
 		callback = callback || function () {};
 		require([
-			'scrollStop', 'forum/chats', 'forum/chats/messages',
-		], function (scrollStop, Chats, ChatsMessages) {
+			'scrollStop', 'forum/chats', 'forum/chats/messages', 'forum/chats/message-search',
+		], function (scrollStop, Chats, ChatsMessages, messageSearch) {
 			app.parseAndTranslate('chat', data, function (chatModal) {
-				if (module.modalExists(data.roomId)) {
+				const roomId = data.roomId;
+				if (module.modalExists(roomId)) {
 					return callback(module.getModal(data.roomId));
 				}
 				const uuid = utils.generateUUID();
 				let dragged = false;
 
-				chatModal.attr('id', 'chat-modal-' + data.roomId);
-				chatModal.attr('data-roomid', data.roomId);
+				chatModal.attr('id', 'chat-modal-' + roomId);
+				chatModal.attr('data-roomid', roomId);
 				chatModal.attr('intervalId', 0);
 				chatModal.attr('data-uuid', uuid);
 				chatModal.css('position', 'fixed');
 				chatModal.appendTo($('body'));
 				chatModal.find('.timeago').timeago();
+				ChatsMessages.wrapImagesInLinks(chatModal.find('[component="chat/messages"] .chat-content'));
 				module.center(chatModal);
 
 				app.loadJQueryUI(function () {
@@ -233,6 +301,7 @@ define('chat', [
 					chatModal.draggable({
 						start: function () {
 							taskbar.updateActive(uuid);
+							chatModal.css({ bottom: 'auto', right: 'auto' });
 						},
 						stop: function () {
 							module.focusInput(chatModal);
@@ -242,10 +311,10 @@ define('chat', [
 					});
 				});
 
-				scrollStop.apply(chatModal.find('[component="chat/messages"]'));
+				scrollStop.apply(chatModal.find('[component="chat/messages"] .chat-content'));
 
 				chatModal.find('#chat-close-btn').on('click', function () {
-					module.close(chatModal);
+					module.close(uuid);
 				});
 
 				function gotoChats() {
@@ -254,8 +323,8 @@ define('chat', [
 						components.get('chat/input').val(text);
 					});
 
-					ajaxify.go('user/' + app.user.userslug + '/chats/' + chatModal.attr('data-roomid'));
-					module.close(chatModal);
+					ajaxify.go(`user/${app.user.userslug}/chats/${roomId}`);
+					module.close(uuid);
 				}
 
 				chatModal.find('.modal-header').on('dblclick', gotoChats);
@@ -281,33 +350,38 @@ define('chat', [
 
 				chatModal.on('mousemove keypress click', function () {
 					if (newMessage) {
-						socket.emit('modules.chats.markRead', data.roomId);
+						api.del(`/chats/${roomId}/state`, {});
 						newMessage = false;
 					}
 				});
 
-				Chats.addActionHandlers(chatModal.find('[component="chat/messages"]'), data.roomId);
-				Chats.addRenameHandler(chatModal.attr('data-roomid'), chatModal.find('[data-action="rename"]'), data.roomName);
-				Chats.addLeaveHandler(chatModal.attr('data-roomid'), chatModal.find('[data-action="leave"]'));
-				Chats.addSendHandlers(chatModal.attr('data-roomid'), chatModal.find('.chat-input'), chatModal.find('[data-action="send"]'));
-				Chats.addMemberHandler(chatModal.attr('data-roomid'), chatModal.find('[data-action="members"]'));
+				Chats.addActionHandlers(chatModal.find('[component="chat/messages"]'), roomId);
+				Chats.addRenameHandler(roomId, chatModal.find('[data-action="rename"]'));
+				Chats.addLeaveHandler(roomId, chatModal.find('[data-action="leave"]'));
+				Chats.addDeleteHandler(roomId, chatModal.find('[data-action="delete"]'));
+				Chats.addSendHandlers(roomId, chatModal.find('.chat-input'), chatModal.find('[data-action="send"]'));
+				Chats.addManageHandler(roomId, chatModal.find('[data-action="manage"]'));
 
-				Chats.createAutoComplete(chatModal.find('[component="chat/input"]'));
+				Chats.createAutoComplete(roomId, chatModal.find('[component="chat/input"]'));
 
-				Chats.addScrollHandler(chatModal.attr('data-roomid'), data.uid, chatModal.find('.chat-content'));
-				Chats.addScrollBottomHandler(chatModal.find('.chat-content'));
-
+				Chats.addScrollHandler(roomId, data.uid, chatModal.find('[component="chat/message/content"]'));
+				Chats.addScrollBottomHandler(chatModal.find('[component="chat/message/content"]'));
+				Chats.addParentHandler(chatModal.find('[component="chat/message/content"]'));
 				Chats.addCharactersLeftHandler(chatModal);
+				Chats.addTextareaResizeHandler(chatModal);
 				Chats.addIPHandler(chatModal);
 
 				Chats.addUploadHandler({
 					dragDropAreaEl: chatModal.find('.modal-content'),
 					pasteEl: chatModal,
 					uploadFormEl: chatModal.find('[component="chat/upload"]'),
+					uploadBtnEl: chatModal.find('[component="chat/upload/button"]'),
 					inputEl: chatModal.find('[component="chat/input"]'),
 				});
 
 				ChatsMessages.addSocketListeners();
+				messageSearch.init(roomId, chatModal);
+				Chats.addNotificationSettingHandler(roomId, chatModal);
 
 				taskbar.push('chat', chatModal.attr('data-uuid'), {
 					title: '[[modules:chat.chatting_with]] ' + (data.roomName || (data.users.length ? data.users[0].username : '')),
@@ -333,8 +407,8 @@ define('chat', [
 		}, 20);
 	};
 
-	module.close = function (chatModal) {
-		const uuid = chatModal.attr('data-uuid');
+	module.close = function (uuid) {
+		const chatModal = $('.chat-modal[data-uuid="' + uuid + '"]');
 		clearInterval(chatModal.attr('intervalId'));
 		chatModal.attr('intervalId', 0);
 		chatModal.remove();
@@ -344,20 +418,22 @@ define('chat', [
 		if (chatModal.attr('data-mobile')) {
 			module.disableMobileBehaviour(chatModal);
 		}
-
+		const roomId = chatModal.attr('data-roomid');
+		require(['forum/chats'], function (chats) {
+			chats.destroyAutoComplete(roomId);
+		});
+		socket.emit('modules.chats.leave', roomId);
 		hooks.fire('action:chat.closed', {
 			uuid: uuid,
 			modal: chatModal,
 		});
 	};
 
-	// TODO: see taskbar.js:44
-	module.closeByUUID = function (uuid) {
-		const chatModal = $('.chat-modal[data-uuid="' + uuid + '"]');
-		module.close(chatModal);
-	};
-
 	module.center = function (chatModal) {
+		const center = chatModal.attr('data-center');
+		if (!center || center === 'false') {
+			return;
+		}
 		let hideAfter = false;
 		if (chatModal.hasClass('hide')) {
 			chatModal.removeClass('hide');
@@ -377,10 +453,11 @@ define('chat', [
 			const chatModal = $('.chat-modal[data-uuid="' + uuid + '"]');
 			chatModal.removeClass('hide');
 			taskbar.updateActive(uuid);
-			ChatsMessages.scrollToBottom(chatModal.find('.chat-content'));
+			ChatsMessages.scrollToBottomAfterImageLoad(chatModal.find('.chat-content'));
 			module.focusInput(chatModal);
-			socket.emit('modules.chats.markRead', chatModal.attr('data-roomid'));
-
+			const roomId = chatModal.attr('data-roomid');
+			api.del(`/chats/${roomId}/state`, {});
+			socket.emit('modules.chats.enter', roomId);
 			const env = utils.findBootstrapEnvironment();
 			if (env === 'xs' || env === 'sm') {
 				module.enableMobileBehaviour(chatModal);
@@ -402,7 +479,7 @@ define('chat', [
 
 		$(window).on('resize', resize);
 		$(window).one('action:ajaxify.start', function () {
-			module.close(modalEl);
+			module.close(modalEl.attr('data-uuid'));
 			$(window).off('resize', resize);
 		});
 	};

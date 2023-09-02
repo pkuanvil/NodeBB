@@ -10,12 +10,12 @@ const aliases = {
 	'admin js bundle': ['adminjs', 'adminscript', 'adminscripts'],
 	javascript: ['js'],
 	'client side styles': [
-		'clientcss', 'clientless', 'clientstyles', 'clientstyle',
+		'clientcss', 'clientscss', 'clientstyles', 'clientstyle',
 	],
 	'admin control panel styles': [
-		'admincss', 'adminless', 'adminstyles', 'adminstyle', 'acpcss', 'acpless', 'acpstyles', 'acpstyle',
+		'admincss', 'adminscss', 'adminstyles', 'adminstyle', 'acpcss', 'acpscss', 'acpstyles', 'acpstyle',
 	],
-	styles: ['css', 'less', 'style'],
+	styles: ['css', 'scss', 'style'],
 	templates: ['tpl'],
 	languages: ['lang', 'i18n'],
 };

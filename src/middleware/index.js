@@ -6,6 +6,7 @@ const validator = require('validator');
 const nconf = require('nconf');
 const toobusy = require('toobusy-js');
 const util = require('util');
+const multipart = require('connect-multiparty');
 const { csrfSynchronisedProtection } = require('./csrf');
 
 const plugins = require('../plugins');
@@ -16,6 +17,7 @@ const analytics = require('../analytics');
 const privileges = require('../privileges');
 const cacheCreate = require('../cache/lru');
 const helpers = require('./helpers');
+const api = require('../api');
 
 const controllers = {
 	api: require('../controllers/api'),
@@ -24,7 +26,9 @@ const controllers = {
 
 const delayCache = cacheCreate({
 	ttl: 1000 * 60,
+	max: 200,
 });
+const multipartMiddleware = multipart();
 
 const middleware = module.exports;
 
@@ -124,6 +128,15 @@ middleware.prepareAPI = function prepareAPI(req, res, next) {
 	next();
 };
 
+middleware.logApiUsage = async function logApiUsage(req, res, next) {
+	if (req.headers.hasOwnProperty('authorization')) {
+		const [, token] = req.headers.authorization.split(' ');
+		await api.utils.tokens.log(token);
+	}
+
+	next();
+};
+
 middleware.routeTouchIcon = function routeTouchIcon(req, res) {
 	if (meta.config['brand:touchIcon'] && validator.isURL(meta.config['brand:touchIcon'])) {
 		return res.redirect(meta.config['brand:touchIcon']);
@@ -160,7 +173,13 @@ async function expose(exposedField, method, field, req, res, next) {
 	if (!req.params.hasOwnProperty(field)) {
 		return next();
 	}
-	res.locals[exposedField] = await method(req.params[field]);
+	const value = await method(String(req.params[field]).toLowerCase());
+	if (!value) {
+		next('route');
+		return;
+	}
+
+	res.locals[exposedField] = value;
 	next();
 }
 
@@ -213,15 +232,21 @@ middleware.delayLoading = function delayLoading(req, res, next) {
 
 middleware.buildSkinAsset = helpers.try(async (req, res, next) => {
 	// If this middleware is reached, a skin was requested, so it is built on-demand
-	const target = path.basename(req.originalUrl).match(/(client-[a-z]+)/);
-	if (!target) {
+	const targetSkin = path.basename(req.originalUrl).split('.css')[0].replace(/-rtl$/, '');
+	if (!targetSkin) {
+		return next();
+	}
+
+	const skins = (await meta.css.getCustomSkins()).map(skin => skin.value);
+	const found = skins.concat(meta.css.supportedSkins).find(skin => `client-${skin}` === targetSkin);
+	if (!found) {
 		return next();
 	}
 
 	await plugins.prepareForBuild(['client side styles']);
-	const css = await meta.css.buildBundle(target[0], true);
+	const [ltr, rtl] = await meta.css.buildBundle(targetSkin, true);
 	require('../meta/minifier').killAll();
-	res.status(200).type('text/css').send(css);
+	res.status(200).type('text/css').send(req.originalUrl.includes('-rtl') ? rtl : ltr);
 });
 
 middleware.addUploadHeaders = function addUploadHeaders(req, res, next) {
@@ -254,11 +279,22 @@ middleware.validateAuth = helpers.try(async (req, res, next) => {
 
 middleware.checkRequired = function (fields, req, res, next) {
 	// Used in API calls to ensure that necessary parameters/data values are present
-	const missing = fields.filter(field => !req.body.hasOwnProperty(field));
+	const missing = fields.filter(field => !req.body.hasOwnProperty(field) && !req.query.hasOwnProperty(field));
 
 	if (!missing.length) {
 		return next();
 	}
 
 	controllers.helpers.formatApiResponse(400, res, new Error(`[[error:required-parameters-missing, ${missing.join(' ')}]]`));
+};
+
+middleware.handleMultipart = (req, res, next) => {
+	// Applies multipart handler on applicable content-type
+	const { 'content-type': contentType } = req.headers;
+
+	if (contentType && !contentType.startsWith('multipart/form-data')) {
+		return next();
+	}
+
+	multipartMiddleware(req, res, next);
 };

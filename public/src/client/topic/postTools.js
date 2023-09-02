@@ -11,7 +11,8 @@ define('forum/topic/postTools', [
 	'bootbox',
 	'alerts',
 	'hooks',
-], function (share, navigator, components, translator, votes, api, bootbox, alerts, hooks) {
+	'helpers',
+], function (share, navigator, components, translator, votes, api, bootbox, alerts, hooks, helpers) {
 	const PostTools = {};
 
 	let staleReplyAnyway = false;
@@ -31,10 +32,14 @@ define('forum/topic/postTools', [
 	};
 
 	function renderMenu() {
+		const container = document.querySelector('[component="topic"]');
+		if (!container) {
+			return;
+		}
 		$('[component="topic"]').on('show.bs.dropdown', '.moderator-tools', function () {
 			const $this = $(this);
 			const dropdownMenu = $this.find('.dropdown-menu');
-			if (dropdownMenu.html()) {
+			if (dropdownMenu.attr('data-loaded')) {
 				return;
 			}
 			const postEl = $this.parents('[data-pid]');
@@ -50,8 +55,8 @@ define('forum/topic/postTools', [
 				const html = await app.parseAndTranslate('partials/topic/post-menu-list', data);
 				const clipboard = require('clipboard');
 
-				dropdownMenu.html(html);
-				dropdownMenu.get(0).classList.toggle('hidden', false);
+				dropdownMenu.attr('data-loaded', 'true').html(html);
+
 				new clipboard('[data-clipboard-text]');
 
 				hooks.fire('action:post.tools.load', {
@@ -75,13 +80,14 @@ define('forum/topic/postTools', [
 	};
 
 	PostTools.removeMenu = function (postEl) {
-		postEl.find('[component="post/tools"] .dropdown-menu').html('');
+		postEl.find('[component="post/tools"] .dropdown-menu')
+			.removeAttr('data-loaded').html('');
 	};
 
 	PostTools.updatePostCount = function (postCount) {
 		const postCountEl = components.get('topic/post-count');
-		postCountEl.html(postCount).attr('title', postCount);
-		utils.makeNumbersHumanReadable(postCountEl);
+		postCountEl.attr('title', postCount)
+			.html(helpers.humanReadableNumber(postCount));
 		navigator.setCount(postCount);
 	};
 
@@ -272,17 +278,17 @@ define('forum/topic/postTools', [
 				hooks.fire('action:composer.addQuote', {
 					tid: tid,
 					pid: toPid,
-					topicName: ajaxify.data.titleRaw,
+					title: ajaxify.data.titleRaw,
 					username: username,
-					text: selectedNode.text,
+					body: selectedNode.text,
 					selectedPid: selectedNode.pid,
 				});
 			} else {
 				hooks.fire('action:composer.post.new', {
 					tid: tid,
 					pid: toPid,
-					topicName: ajaxify.data.titleRaw,
-					text: username ? username + ' ' : ($('[component="topic/quickreply/text"]').val() || ''),
+					title: ajaxify.data.titleRaw,
+					body: username ? username + ' ' : ($('[component="topic/quickreply/text"]').val() || ''),
 				});
 			}
 		});
@@ -300,7 +306,7 @@ define('forum/topic/postTools', [
 					tid: tid,
 					pid: toPid,
 					username: username,
-					topicName: ajaxify.data.titleRaw,
+					title: ajaxify.data.titleRaw,
 					text: text,
 				});
 			}
@@ -308,13 +314,9 @@ define('forum/topic/postTools', [
 			if (selectedNode.text && toPid && toPid === selectedNode.pid) {
 				return quote(selectedNode.text);
 			}
-			socket.emit('posts.getRawPost', toPid, function (err, post) {
-				if (err) {
-					return alerts.error(err);
-				}
 
-				quote(post);
-			});
+			const { content } = await api.get(`/posts/${toPid}/raw`);
+			quote(content);
 		});
 	}
 
@@ -331,22 +333,11 @@ define('forum/topic/postTools', [
 			}
 		});
 
-		if (content) {
-			const bounds = document.createRange();
-			bounds.selectNodeContents(content);
-			const range = selection.getRangeAt(0).cloneRange();
-			if (range.compareBoundaryPoints(Range.START_TO_START, bounds) < 0) {
-				range.setStart(bounds.startContainer, bounds.startOffset);
-			}
-			if (range.compareBoundaryPoints(Range.END_TO_END, bounds) > 0) {
-				range.setEnd(bounds.endContainer, bounds.endOffset);
-			}
-			bounds.detach();
-			selectedText = range.toString();
+		if (content && selection) {
+			selectedText = selection.toString();
 			const postEl = $(content).parents('[component="post"]');
 			selectedPid = postEl.attr('data-pid');
 			username = await getUserSlug($(content));
-			range.detach();
 		}
 		return { text: selectedText, pid: selectedPid, username: username };
 	}
@@ -473,7 +464,7 @@ define('forum/topic/postTools', [
 		warning.modal();
 	}
 
-	const selectionChangeFn = utils.debounce(selectionChange, 100);
+	const selectionChangeFn = utils.debounce(selectionChange, 250);
 
 	function handleSelectionTooltip() {
 		if (!ajaxify.data.privileges['topics:reply']) {
@@ -481,15 +472,19 @@ define('forum/topic/postTools', [
 		}
 
 		hooks.onPage('action:posts.loaded', delayedTooltip);
-
-		$(document).off('selectionchange', selectionChangeFn).on('selectionchange', selectionChangeFn);
+		$(document).off('selectionchange');
+		$(document).on('selectionchange', function () {
+			const selectionEmpty = window.getSelection().toString() === '';
+			if (selectionEmpty) {
+				$('[component="selection/tooltip"]').addClass('hidden');
+			}
+		});
+		$(document).on('selectionchange', selectionChangeFn);
 	}
 
 	function selectionChange() {
 		const selectionEmpty = window.getSelection().toString() === '';
-		if (selectionEmpty) {
-			$('[component="selection/tooltip"]').addClass('hidden');
-		} else {
+		if (!selectionEmpty) {
 			delayedTooltip();
 		}
 	}
@@ -521,6 +516,7 @@ define('forum/topic/postTools', [
 
 			if (!selectionTooltip.length) {
 				selectionTooltip = await app.parseAndTranslate('partials/topic/selection-tooltip', ajaxify.data);
+				$('[component="selection/tooltip"]').remove();
 				selectionTooltip.addClass('hidden').appendTo('body');
 			}
 			selectionTooltip.off('click').on('click', '[component="selection/tooltip/quote"]', function () {

@@ -2,45 +2,63 @@
 
 
 define('forum/topic/votes', [
-	'components', 'translator', 'api', 'hooks', 'bootbox', 'alerts',
-], function (components, translator, api, hooks, bootbox, alerts) {
+	'components', 'translator', 'api', 'hooks', 'bootbox', 'alerts', 'bootstrap',
+], function (components, translator, api, hooks, bootbox, alerts, bootstrap) {
 	const Votes = {};
+	let _showTooltip = {};
 
 	Votes.addVoteHandler = function () {
+		_showTooltip = {};
 		components.get('topic').on('mouseenter', '[data-pid] [component="post/vote-count"]', loadDataAndCreateTooltip);
+		components.get('topic').on('mouseleave', '[data-pid] [component="post/vote-count"]', destroyTooltip);
 	};
 
-	function loadDataAndCreateTooltip(e) {
-		e.stopPropagation();
+	function destroyTooltip() {
+		const $this = $(this);
+		const pid = $this.parents('[data-pid]').attr('data-pid');
+		const tooltip = bootstrap.Tooltip.getInstance(this);
+		if (tooltip) {
+			tooltip.dispose();
+			$this.attr('title', '');
+		}
+		_showTooltip[pid] = false;
+	}
 
+	function loadDataAndCreateTooltip() {
 		const $this = $(this);
 		const el = $this.parent();
-		el.find('.tooltip').css('display', 'none');
 		const pid = el.parents('[data-pid]').attr('data-pid');
+		_showTooltip[pid] = true;
+		const tooltip = bootstrap.Tooltip.getInstance(this);
+		if (tooltip) {
+			tooltip.dispose();
+			$this.attr('title', '');
+		}
 
 		socket.emit('posts.getUpvoters', [pid], function (err, data) {
 			if (err) {
 				return alerts.error(err);
 			}
-
-			if (data.length) {
+			if (_showTooltip[pid] && data.length) {
 				createTooltip($this, data[0]);
 			}
 		});
-		return false;
 	}
 
 	function createTooltip(el, data) {
 		function doCreateTooltip(title) {
-			el.attr('title', title).tooltip('fixTitle').tooltip('show');
-			el.parent().find('.tooltip').css('display', '');
+			el.attr('title', title);
+			(new bootstrap.Tooltip(el, {
+				container: '#content',
+				html: true,
+			})).show();
 		}
 		let usernames = data.usernames
 			.filter(name => name !== '[[global:former_user]]');
 		if (!usernames.length) {
 			return;
 		}
-		if (usernames.length + data.otherCount > 6) {
+		if (usernames.length + data.otherCount > data.cutoff) {
 			usernames = usernames.join(', ').replace(/,/g, '|');
 			translator.translate('[[topic:users_and_others, ' + usernames + ', ' + data.otherCount + ']]', function (translated) {
 				translated = translated.replace(/\|/g, ',');
@@ -90,12 +108,14 @@ define('forum/topic/votes', [
 				return alerts.error(err);
 			}
 
-			app.parseAndTranslate('partials/modals/votes_modal', data, function (html) {
+			app.parseAndTranslate('modals/votes', data, function (html) {
 				const dialog = bootbox.dialog({
 					title: '[[global:voters]]',
 					message: html,
 					className: 'vote-modal',
 					show: true,
+					onEscape: true,
+					backdrop: true,
 				});
 
 				dialog.on('click', function () {

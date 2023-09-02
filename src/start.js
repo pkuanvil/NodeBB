@@ -95,8 +95,9 @@ function printStartupInfo() {
 }
 
 function addProcessHandlers() {
-	process.on('SIGTERM', shutdown);
-	process.on('SIGINT', shutdown);
+	['SIGTERM', 'SIGINT', 'SIGQUIT'].forEach((signal) => {
+		process.on(signal, () => shutdown());
+	});
 	process.on('SIGHUP', restart);
 	process.on('uncaughtException', (err) => {
 		winston.error(err.stack);
@@ -105,12 +106,14 @@ function addProcessHandlers() {
 		shutdown(1);
 	});
 	process.on('message', (msg) => {
-		if (msg && msg.compiling === 'tpl') {
-			const benchpressjs = require('benchpressjs');
-			benchpressjs.flush();
-		} else if (msg && msg.compiling === 'lang') {
-			const translator = require('./translator');
-			translator.flush();
+		if (msg && Array.isArray(msg.compiling)) {
+			if (msg.compiling.includes('tpl')) {
+				const benchpressjs = require('benchpressjs');
+				benchpressjs.flush();
+			} else if (msg.compiling.includes('lang')) {
+				const translator = require('./translator');
+				translator.flush();
+			}
 		}
 	});
 }
@@ -128,7 +131,7 @@ function restart() {
 }
 
 async function shutdown(code) {
-	winston.info('[app] Shutdown (SIGTERM/SIGINT) Initialised.');
+	winston.info('[app] Shutdown (SIGTERM/SIGINT/SIGQUIT) Initialised.');
 	try {
 		await require('./webserver').destroy();
 		winston.info('[app] Web server closed to connections.');
@@ -140,6 +143,7 @@ async function shutdown(code) {
 		process.exit(code || 0);
 	} catch (err) {
 		winston.error(err.stack);
+
 		return process.exit(code || 0);
 	}
 }

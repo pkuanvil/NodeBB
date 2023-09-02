@@ -1,22 +1,26 @@
 'use strict';
 
-define('forum/header/chat', ['components'], function (components) {
+define('forum/header/chat', [
+	'components', 'hooks',
+], function (components, hooks) {
 	const chat = {};
 
 	chat.prepareDOM = function () {
-		const chatsToggleEl = components.get('chat/dropdown');
-		const chatsListEl = components.get('chat/list');
+		const chatsToggleEl = $('[component="chat/dropdown"]');
+		if (!chatsToggleEl.length) {
+			return;
+		}
 
-		chatsToggleEl.on('click', function () {
-			if (chatsToggleEl.parent().hasClass('open')) {
-				return;
-			}
-			requireAndCall('loadChatsDropdown', chatsListEl);
+		chatsToggleEl.on('show.bs.dropdown', (ev) => {
+			requireAndCall('loadChatsDropdown', $(ev.target).parent().find('[component="chat/list"]'));
 		});
 
-		if (chatsToggleEl.parents('.dropdown').hasClass('open')) {
-			requireAndCall('loadChatsDropdown', chatsListEl);
-		}
+		chatsToggleEl.each((index, el) => {
+			const dropdownEl = $(el).parent().find('.dropdown-menu');
+			if (dropdownEl.hasClass('show')) {
+				requireAndCall('loadChatsDropdown', dropdownEl.find('[component="chat/list"]'));
+			}
+		});
 
 		socket.removeListener('event:chats.receive', onChatMessageReceived);
 		socket.on('event:chats.receive', onChatMessageReceived);
@@ -27,10 +31,31 @@ define('forum/header/chat', ['components'], function (components) {
 		socket.removeListener('event:chats.roomRename', onRoomRename);
 		socket.on('event:chats.roomRename', onRoomRename);
 
-		socket.on('event:unread.updateChatCount', function (count) {
+		socket.on('event:unread.updateChatCount', async function (data) {
+			if (data) {
+				const [chatModule, chatPage] = await app.require(['chat', 'forum/chats']);
+				if (
+					chatModule.isFromBlockedUser(data.fromUid) ||
+					chatModule.isLookingAtRoom(data.roomId) ||
+					app.user.uid === parseInt(data.fromUid, 10)
+				) {
+					return;
+				}
+				chatPage.markChatPageElUnread(data);
+			}
+
+			let count = await socket.emit('modules.chats.getUnreadCount', {});
+			const chatIcon = components.get('chat/icon');
+			count = Math.max(0, count);
+			chatIcon.toggleClass('fa-comment', count > 0)
+				.toggleClass('fa-comment-o', count <= 0);
+
+			const countText = count > 99 ? '99+' : count;
 			components.get('chat/icon')
 				.toggleClass('unread-count', count > 0)
-				.attr('data-content', count > 99 ? '99+' : count);
+				.attr('data-content', countText);
+			components.get('chat/count').toggleClass('hidden', count <= 0).text(countText);
+			hooks.fire('action:chat.updateCount', { count });
 		});
 	};
 
@@ -46,10 +71,9 @@ define('forum/header/chat', ['components'], function (components) {
 		requireAndCall('onRoomRename', data);
 	}
 
-	function requireAndCall(method, param) {
-		require(['chat'], function (chat) {
-			chat[method](param);
-		});
+	async function requireAndCall(method, param) {
+		const chat = await app.require('chat');
+		chat[method](param);
 	}
 
 	return chat;

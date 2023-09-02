@@ -26,7 +26,7 @@ module.exports = function (module) {
 	module.scan = async function (params) {
 		let cursor = '0';
 		let returnData = [];
-		const seen = {};
+		const seen = Object.create(null);
 		do {
 			/* eslint-disable no-await-in-loop */
 			const res = await module.client.scan(cursor, 'MATCH', params.match, 'COUNT', 10000);
@@ -58,6 +58,13 @@ module.exports = function (module) {
 
 	module.get = async function (key) {
 		return await module.client.get(key);
+	};
+
+	module.mget = async function (keys) {
+		if (!keys || !Array.isArray(keys) || !keys.length) {
+			return [];
+		}
+		return await module.client.mget(keys);
 	};
 
 	module.set = async function (key, value) {

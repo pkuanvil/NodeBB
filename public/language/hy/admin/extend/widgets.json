@@ -1,4 +1,5 @@
 {
+	"widgets": "Widgets",
 	"available": "Հասանելի վիդջեթներ",
 	"explanation": "Բացվող ընտրացանկից ընտրեք վիջեթ, այնուհետև քաշեք և թողեք այն ձախ կողմում գտնվող ձևանմուշի վիդջեթի տարածք:",
 	"none-installed": "Վիջեթներ չեն գտնվել: Ակտիվացրեք վիջեթի հիմնական հավելվածը plugins կառավարման վահանակում:",
@@ -8,9 +9,9 @@
 	"containers.none": "None",
 	"container.well": "Well",
 	"container.jumbotron": "Jumbotron",
-	"container.panel": "Panel",
-	"container.panel-header": "Panel-ի վերնագիր",
-	"container.panel-body": "Panel Body",
+	"container.card": "Card",
+	"container.card-header": "Card Header",
+	"container.card-body": "Card Body",
 	"container.alert": "Զգուշացում",
 
 	"alert.confirm-delete": "Վստա՞հ եք, որ ցանկանում եք ջնջել այս վիջեթը:",
@@ -26,5 +27,7 @@
 	"container.placeholder": "Քաշեք և գցեք կոնտեյներ կամ մուտքագրեք HTML այստեղ:",
 	"show-to-groups": "Ցույց տալ խմբերին ",
 	"hide-from-groups": "Թաքցնել խմբերից",
+	"start-date": "Start date",
+	"end-date": "End date",
 	"hide-on-mobile": "Թաքցնել բջջայինի վրա"
 }

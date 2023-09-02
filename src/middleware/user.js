@@ -6,12 +6,14 @@ const nconf = require('nconf');
 const path = require('path');
 const util = require('util');
 
+const meta = require('../meta');
 const user = require('../user');
 const privileges = require('../privileges');
 const plugins = require('../plugins');
 const helpers = require('./helpers');
 const auth = require('../routes/authentication');
 const writeRouter = require('../routes/write');
+const accountHelpers = require('../controllers/accounts/helpers');
 
 const controllers = {
 	helpers: require('../controllers/helpers'),
@@ -181,6 +183,7 @@ module.exports = function (middleware) {
 		if (allowed) {
 			return next();
 		}
+
 		controllers.helpers.notAllowed(req, res);
 	});
 
@@ -228,23 +231,47 @@ module.exports = function (middleware) {
 		res.status(403).render('403', { title: '[[global:403.title]]' });
 	};
 
+	middleware.buildAccountData = async (req, res, next) => {
+		res.locals.templateValues = await accountHelpers.getUserDataByUserSlug(req.params.userslug, req.uid, req.query);
+		next();
+	};
+
 	middleware.registrationComplete = async function registrationComplete(req, res, next) {
-		// If the user's session contains registration data, redirect the user to complete registration
+		/**
+		 * Redirect the user to complete registration if:
+		 *   * user's session contains registration data
+		 *   * email is required and they have no confirmed email (pending doesn't count, but admins are OK)
+		 */
+		const path = req.path.startsWith('/api/') ? req.path.replace('/api', '') : req.path;
+
+		if (req.uid > 0 && !(path.endsWith('/edit/email') || path.startsWith('/confirm/'))) {
+			const [confirmed, isAdmin] = await Promise.all([
+				user.getUserField(req.uid, 'email:confirmed'),
+				user.isAdministrator(req.uid),
+			]);
+			if (meta.config.requireEmailAddress && !confirmed && !isAdmin) {
+				req.session.registration = {
+					...req.session.registration,
+					uid: req.uid,
+					updateEmail: true,
+				};
+			}
+		}
+
 		if (!req.session.hasOwnProperty('registration')) {
 			return setImmediate(next);
 		}
 
-		const path = req.path.startsWith('/api/') ? req.path.replace('/api', '') : req.path;
 		const { allowed } = await plugins.hooks.fire('filter:middleware.registrationComplete', {
-			allowed: ['/register/complete'],
+			allowed: ['/register/complete', '/confirm/'],
 		});
-		if (!allowed.includes(path)) {
-			// Append user data if present
-			req.session.registration.uid = req.session.registration.uid || req.uid;
-
-			controllers.helpers.redirect(res, '/register/complete');
-		} else {
-			setImmediate(next);
+		if (allowed.includes(path) || allowed.some(p => path.startsWith(p))) {
+			return setImmediate(next);
 		}
+
+		// Append user data if present
+		req.session.registration.uid = req.session.registration.uid || req.uid;
+
+		controllers.helpers.redirect(res, '/register/complete');
 	};
 };

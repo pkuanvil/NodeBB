@@ -14,6 +14,7 @@
 	"manage/users": "Usuários",
 	"manage/admins-mods": "Admins & Mods",
 	"manage/registration": "Fila de Registro",
+	"manage/flagged-content": "Flagged Content",
 	"manage/post-queue": "Fila de Posts",
 	"manage/groups": "Grupos",
 	"manage/ip-blacklist": "Lista Negra de IPs",
@@ -72,7 +73,9 @@
 	"development/info": "Informação",
 
 	"rebuild-and-restart-forum": "Recompilar & Reiniciar Fórum",
+	"rebuild-and-restart": "Rebuild & Restart",
 	"restart-forum": "Reiniciar Fórum",
+	"restart": "Restart",
 	"logout": "Sair da Conta",
 	"view-forum": "Ver Fórum",
 

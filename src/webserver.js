@@ -179,8 +179,12 @@ function setupExpressApp(app) {
 	app.use(middleware.processRender);
 	auth.initialize(app, middleware);
 	const als = require('./als');
+	const apiHelpers = require('./api/helpers');
 	app.use((req, res, next) => {
-		als.run({ uid: req.uid }, next);
+		als.run({
+			uid: req.uid,
+			req: apiHelpers.buildReqObject(req),
+		}, next);
 	});
 	app.use(middleware.autoLocale); // must be added after auth middlewares are added
 
@@ -195,20 +199,22 @@ function setupHelmet(app) {
 		crossOriginOpenerPolicy: { policy: meta.config['cross-origin-opener-policy'] },
 		crossOriginResourcePolicy: { policy: meta.config['cross-origin-resource-policy'] },
 		referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+		crossOriginEmbedderPolicy: !!meta.config['cross-origin-embedder-policy'],
 	};
 
-	if (!meta.config['cross-origin-embedder-policy']) {
-		options.crossOriginEmbedderPolicy = false;
-	}
 	if (meta.config['hsts-enabled']) {
 		options.hsts = {
-			maxAge: meta.config['hsts-maxage'],
+			maxAge: Math.max(0, meta.config['hsts-maxage']),
 			includeSubDomains: !!meta.config['hsts-subdomains'],
 			preload: !!meta.config['hsts-preload'],
 		};
 	}
 
-	app.use(helmet(options));
+	try {
+		app.use(helmet(options));
+	} catch (err) {
+		winston.error(`[startup] unable to initialize helmet \n${err.stack}`);
+	}
 }
 
 

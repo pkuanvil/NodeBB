@@ -7,8 +7,10 @@ const request = require('request');
 const requestAsync = require('request-promise-native');
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
 
 const db = require('./mocks/databasemock');
+const api = require('../src/api');
 const categories = require('../src/categories');
 const topics = require('../src/topics');
 const posts = require('../src/posts');
@@ -20,6 +22,8 @@ const privileges = require('../src/privileges');
 const plugins = require('../src/plugins');
 const utils = require('../src/utils');
 const helpers = require('./helpers');
+
+const sleep = util.promisify(setTimeout);
 
 describe('Controllers', () => {
 	let tid;
@@ -398,6 +402,8 @@ describe('Controllers', () => {
 
 				assert(!res.body.errors.includes('[[error:invalid-email]]'));
 				assert(!res.body.errors.includes('[[error:gdpr_consent_denied]]'));
+
+				meta.config.requireEmailAddress = 1;
 			});
 
 			it('should error if userData is falsy', async () => {
@@ -411,20 +417,28 @@ describe('Controllers', () => {
 
 			it('should throw error if email is not valid', async () => {
 				const uid = await user.create({ username: 'interstiuser1' });
-				try {
-					const result = await user.interstitials.email({
-						userData: { uid: uid, updateEmail: true },
-						req: { uid: uid },
-						interstitials: [],
-					});
-					assert.strictEqual(result.interstitials[0].template, 'partials/email_update');
-					await result.interstitials[0].callback({ uid }, {
-						email: 'invalidEmail',
-					});
-					assert(false);
-				} catch (err) {
-					assert.strictEqual(err.message, '[[error:invalid-email]]');
-				}
+				const result = await user.interstitials.email({
+					userData: { uid: uid, updateEmail: true },
+					req: { uid: uid },
+					interstitials: [],
+				});
+				assert.strictEqual(result.interstitials[0].template, 'partials/email_update');
+				await assert.rejects(result.interstitials[0].callback({ uid }, {
+					email: 'invalidEmail',
+				}), { message: '[[error:invalid-email]]' });
+			});
+
+			it('should reject an email that comprises only whitespace', async () => {
+				const uid = await user.create({ username: utils.generateUUID().slice(0, 10) });
+				const result = await user.interstitials.email({
+					userData: { uid: uid, updateEmail: true },
+					req: { uid: uid },
+					interstitials: [],
+				});
+				assert.strictEqual(result.interstitials[0].template, 'partials/email_update');
+				await assert.rejects(result.interstitials[0].callback({ uid }, {
+					email: '    ',
+				}), { message: '[[error:invalid-email]]' });
 			});
 
 			it('should set req.session.emailChanged to 1', async () => {
@@ -475,7 +489,9 @@ describe('Controllers', () => {
 				}
 			});
 
-			it('should remove current email', async () => {
+			it('should remove current email (only allowed if email not required)', async () => {
+				meta.config.requireEmailAddress = 0;
+
 				const uid = await user.create({ username: 'interstiuser5' });
 				await user.setUserField(uid, 'email', 'interstiuser5@nodebb.org');
 				await user.email.confirmByUid(uid);
@@ -492,6 +508,8 @@ describe('Controllers', () => {
 				const userData = await user.getUserData(uid);
 				assert.strictEqual(userData.email, '');
 				assert.strictEqual(userData['email:confirmed'], 0);
+
+				meta.config.requireEmailAddress = 1;
 			});
 
 			it('should require a password (if one is set) for email change', async () => {
@@ -516,6 +534,8 @@ describe('Controllers', () => {
 			});
 
 			it('should require a password (if one is set) for email clearing', async () => {
+				meta.config.requireEmailAddress = 0;
+
 				try {
 					const [username, password] = [utils.generateUUID().slice(0, 10), utils.generateUUID()];
 					const uid = await user.create({ username, password });
@@ -534,6 +554,8 @@ describe('Controllers', () => {
 				} catch (err) {
 					assert.strictEqual(err.message, '[[error:invalid-password]]');
 				}
+
+				meta.config.requireEmailAddress = 1;
 			});
 
 			it('should successfully issue validation request if the correct password is passed in', async () => {
@@ -560,6 +582,56 @@ describe('Controllers', () => {
 				const userData = await user.getUserData(uid);
 				assert.strictEqual(userData.email, `${username}@nodebb.com`);
 				assert.strictEqual(userData['email:confirmed'], 1);
+			});
+
+			describe('blocking access for unconfirmed emails', () => {
+				let jar;
+				let token;
+
+				before(async () => {
+					jar = await helpers.registerUser({
+						username: utils.generateUUID().slice(0, 10),
+						password: utils.generateUUID(),
+					});
+					token = await helpers.getCsrfToken(jar);
+				});
+
+				it('should not apply if requireEmailAddress is not enabled', async () => {
+					meta.config.requireEmailAddress = 0;
+
+					const res = await requestAsync(`${nconf.get('url')}/register/complete`, {
+						method: 'post',
+						jar,
+						json: true,
+						followRedirect: false,
+						simple: false,
+						resolveWithFullResponse: true,
+						headers: {
+							'x-csrf-token': token,
+						},
+						form: {
+							email: `${utils.generateUUID().slice(0, 10)}@example.org`,
+							gdpr_agree_data: 'on',
+							gdpr_agree_email: 'on',
+						},
+					});
+
+					assert.strictEqual(res.headers.location, `${nconf.get('relative_path')}/`);
+					meta.config.requireEmailAddress = 1;
+				});
+
+				it('should continue to redirect back to interstitial after an email is entered, as it is not confirmed', async () => {
+					const res = await requestAsync(`${nconf.get('url')}/recent`, {
+						jar,
+						json: true,
+						resolveWithFullResponse: true,
+						followRedirect: false,
+						simple: false,
+					});
+
+					assert.strictEqual(res.statusCode, 307);
+					assert.strictEqual(res.headers.location, `${nconf.get('relative_path')}/register/complete`);
+				});
 			});
 		});
 
@@ -594,6 +666,74 @@ describe('Controllers', () => {
 
 				assert.strictEqual(res.statusCode, 302);
 				assert.strictEqual(res.headers.location, `${nconf.get('relative_path')}/`);
+			});
+		});
+
+		describe('abort behaviour', () => {
+			let jar;
+			let token;
+
+			beforeEach(async () => {
+				jar = await helpers.registerUser({
+					username: utils.generateUUID().slice(0, 10),
+					password: utils.generateUUID(),
+				});
+				token = await helpers.getCsrfToken(jar);
+			});
+
+			it('should terminate the session and send user back to index if interstitials remain', async () => {
+				const res = await requestAsync(`${nconf.get('url')}/register/abort`, {
+					method: 'post',
+					jar,
+					json: true,
+					followRedirect: false,
+					simple: false,
+					resolveWithFullResponse: true,
+					headers: {
+						'x-csrf-token': token,
+					},
+				});
+
+				assert.strictEqual(res.statusCode, 302);
+				assert.strictEqual(res.headers['set-cookie'][0], `express.sid=; Path=${nconf.get('relative_path') || '/'}; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`);
+				assert.strictEqual(res.headers.location, `${nconf.get('relative_path')}/`);
+			});
+
+			it('should preserve the session and send user back to user profile if no interstitials remain (e.g. GDPR OK + email change cancellation)', async () => {
+				// Submit GDPR consent
+				await requestAsync(`${nconf.get('url')}/register/complete`, {
+					method: 'post',
+					jar,
+					json: true,
+					followRedirect: false,
+					simple: false,
+					resolveWithFullResponse: true,
+					headers: {
+						'x-csrf-token': token,
+					},
+					form: {
+						gdpr_agree_data: 'on',
+						gdpr_agree_email: 'on',
+					},
+				});
+
+				// Start email change flow
+				await requestAsync(`${nconf.get('url')}/me/edit/email`, { jar });
+
+				const res = await requestAsync(`${nconf.get('url')}/register/abort`, {
+					method: 'post',
+					jar,
+					json: true,
+					followRedirect: false,
+					simple: false,
+					resolveWithFullResponse: true,
+					headers: {
+						'x-csrf-token': token,
+					},
+				});
+
+				assert.strictEqual(res.statusCode, 302);
+				assert(res.headers.location.match(/\/uid\/\d+$/));
 			});
 		});
 	});
@@ -1490,30 +1630,40 @@ describe('Controllers', () => {
 			});
 		});
 
-		it('should export users posts', (done) => {
-			request(`${nconf.get('url')}/api/user/foo/export/posts`, { jar: jar }, (err, res, body) => {
-				assert.ifError(err);
-				assert.equal(res.statusCode, 200);
-				assert(body);
-				done();
+		describe('user data export routes', () => {
+			before(async () => {
+				const types = ['profile', 'uploads', 'posts'];
+				await Promise.all(types.map(async (type) => {
+					await api.users.generateExport({ uid: fooUid, ip: '127.0.0.1' }, { uid: fooUid, type });
+				}));
+				await sleep(10000);
 			});
-		});
 
-		it('should export users uploads', (done) => {
-			request(`${nconf.get('url')}/api/user/foo/export/uploads`, { jar: jar }, (err, res, body) => {
-				assert.ifError(err);
-				assert.equal(res.statusCode, 200);
-				assert(body);
-				done();
+			it('should export users posts', (done) => {
+				request(`${nconf.get('url')}/api/v3/users/${fooUid}/exports/posts`, { jar: jar }, (err, res, body) => {
+					assert.ifError(err);
+					assert.equal(res.statusCode, 200);
+					assert(body);
+					done();
+				});
 			});
-		});
 
-		it('should export users profile', (done) => {
-			request(`${nconf.get('url')}/api/user/foo/export/profile`, { jar: jar }, (err, res, body) => {
-				assert.ifError(err);
-				assert.equal(res.statusCode, 200);
-				assert(body);
-				done();
+			it('should export users uploads', (done) => {
+				request(`${nconf.get('url')}/api/v3/users/${fooUid}/exports/uploads`, { jar: jar }, (err, res, body) => {
+					assert.ifError(err);
+					assert.equal(res.statusCode, 200);
+					assert(body);
+					done();
+				});
+			});
+
+			it('should export users profile', (done) => {
+				request(`${nconf.get('url')}/api/v3/users/${fooUid}/exports/profile`, { jar: jar }, (err, res, body) => {
+					assert.ifError(err);
+					assert.equal(res.statusCode, 200);
+					assert(body);
+					done();
+				});
 			});
 		});
 
@@ -1547,7 +1697,7 @@ describe('Controllers', () => {
 					assert.equal(res.statusCode, 200);
 					assert(body);
 					const notif = body.notifications[0];
-					assert.equal(notif.bodyShort, notifData.bodyShort);
+					assert.equal(notif.bodyShort, '<strong>test1</strong> has posted a reply to: <strong>test2</strong>');
 					assert.equal(notif.bodyLong, notifData.bodyLong);
 					assert.equal(notif.pid, notifData.pid);
 					assert.equal(notif.path, nconf.get('relative_path') + notifData.path);
@@ -1621,23 +1771,13 @@ describe('Controllers', () => {
 			});
 		});
 
-		it('should return false if user can not edit user', (done) => {
-			user.create({ username: 'regularJoe', password: 'barbar' }, (err) => {
-				assert.ifError(err);
-				helpers.loginUser('regularJoe', 'barbar', (err, data) => {
-					assert.ifError(err);
-					const { jar } = data;
-					request(`${nconf.get('url')}/api/user/foo/info`, { jar: jar, json: true }, (err, res) => {
-						assert.ifError(err);
-						assert.equal(res.statusCode, 403);
-						request(`${nconf.get('url')}/api/user/foo/edit`, { jar: jar, json: true }, (err, res) => {
-							assert.ifError(err);
-							assert.equal(res.statusCode, 403);
-							done();
-						});
-					});
-				});
-			});
+		it('should return false if user can not edit user', async () => {
+			await user.create({ username: 'regularJoe', password: 'barbar' });
+			const { jar } = await helpers.loginUser('regularJoe', 'barbar');
+			let { statusCode } = await requestAsync(`${nconf.get('url')}/api/user/foo/info`, { jar: jar, json: true, simple: false, resolveWithFullResponse: true });
+			assert.equal(statusCode, 403);
+			({ statusCode } = await requestAsync(`${nconf.get('url')}/api/user/foo/edit`, { jar: jar, json: true, simple: false, resolveWithFullResponse: true }));
+			assert.equal(statusCode, 403);
 		});
 
 		it('should load correct user', (done) => {
@@ -1693,22 +1833,18 @@ describe('Controllers', () => {
 			});
 		});
 
-		it('should increase profile view', (done) => {
-			helpers.loginUser('regularJoe', 'barbar', (err, data) => {
-				assert.ifError(err);
-				const { jar } = data;
-				request(`${nconf.get('url')}/api/user/foo`, { jar: jar }, (err, res) => {
-					assert.ifError(err);
-					assert.equal(res.statusCode, 200);
-					setTimeout(() => {
-						user.getUserField(fooUid, 'profileviews', (err, viewcount) => {
-							assert.ifError(err);
-							assert(viewcount > 0);
-							done();
-						});
-					}, 500);
-				});
+		it('should increase profile view', async () => {
+			const { jar } = await helpers.loginUser('regularJoe', 'barbar');
+			const { statusCode } = await requestAsync(`${nconf.get('url')}/api/user/foo`, {
+				jar: jar,
+				simple: false,
+				resolveWithFullResponse: true,
 			});
+			assert.equal(statusCode, 200);
+
+			await sleep(500);
+			const viewcount = await user.getUserField(fooUid, 'profileviews');
+			assert(viewcount > 0);
 		});
 
 		it('should parse about me', (done) => {
@@ -1816,10 +1952,13 @@ describe('Controllers', () => {
 			assert.strictEqual(res.body, '/register/complete');
 
 			await requestAsync({
-				uri: `${nconf.get('url')}/register/abort?_csrf=${csrf_token}`,
+				uri: `${nconf.get('url')}/register/abort`,
 				method: 'post',
 				jar,
 				simple: false,
+				headers: {
+					'x-csrf-token': csrf_token,
+				},
 			});
 		});
 
@@ -2552,6 +2691,42 @@ describe('Controllers', () => {
 					done();
 				});
 			});
+		});
+
+		it('should create a new topic and reply by composer route as a guest', async () => {
+			const jar = request.jar();
+			const csrf_token = await helpers.getCsrfToken(jar);
+			const data = {
+				cid: cid,
+				title: 'no js is good',
+				content: 'a topic with noscript',
+				handle: 'guest1',
+			};
+
+			await privileges.categories.give(['groups:topics:create', 'groups:topics:reply'], cid, 'guests');
+
+			const result = await helpers.request('post', `/compose`, {
+				form: data,
+				jar,
+				headers: {
+					'x-csrf-token': csrf_token,
+				},
+			});
+			assert.strictEqual(result.res.statusCode, 302);
+
+			const replyResult = await helpers.request('post', `/compose`, {
+				form: {
+					tid: tid,
+					content: 'a new reply',
+					handle: 'guest2',
+				},
+				jar,
+				headers: {
+					'x-csrf-token': csrf_token,
+				},
+			});
+			assert.equal(replyResult.res.statusCode, 302);
+			await privileges.categories.rescind(['groups:topics:post', 'groups:topics:reply'], cid, 'guests');
 		});
 	});
 

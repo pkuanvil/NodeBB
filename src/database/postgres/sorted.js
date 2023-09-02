@@ -457,6 +457,11 @@ SELECT o."_key" k
 		return data && data[0];
 	};
 
+	module.getSortedSetMembersWithScores = async function (key) {
+		const data = await module.getSortedSetsMembersWithScores([key]);
+		return data && data[0];
+	};
+
 	module.getSortedSetsMembers = async function (keys) {
 		if (!Array.isArray(keys) || !keys.length) {
 			return [];
@@ -467,6 +472,23 @@ SELECT o."_key" k
 			text: `
 SELECT "_key" k,
        "nodebb_get_sorted_set_members"("_key") m
+  FROM UNNEST($1::TEXT[]) "_key";`,
+			values: [keys],
+		});
+
+		return keys.map(k => (res.rows.find(r => r.k === k) || {}).m || []);
+	};
+
+	module.getSortedSetsMembersWithScores = async function (keys) {
+		if (!Array.isArray(keys) || !keys.length) {
+			return [];
+		}
+
+		const res = await module.pool.query({
+			name: 'getSortedSetsMembersWithScores',
+			text: `
+SELECT "_key" k,
+       "nodebb_get_sorted_set_members_withscores"("_key") m
   FROM UNNEST($1::TEXT[]) "_key";`,
 			values: [keys],
 		});
@@ -642,6 +664,7 @@ SELECT z."value",
 	module.processSortedSet = async function (setKey, process, options) {
 		const client = await module.pool.connect();
 		const batchSize = (options || {}).batch || 100;
+		const sort = options.reverse ? 'DESC' : 'ASC';
 		const cursor = client.query(new Cursor(`
 SELECT z."value", z."score"
   FROM "legacy_object_live" o
@@ -649,12 +672,12 @@ SELECT z."value", z."score"
          ON o."_key" = z."_key"
         AND o."type" = z."type"
  WHERE o."_key" = $1::TEXT
- ORDER BY z."score" ASC, z."value" ASC`, [setKey]));
+ ORDER BY z."score" ${sort}, z."value" ${sort}`, [setKey]));
 
 		if (process && process.constructor && process.constructor.name !== 'AsyncFunction') {
 			process = util.promisify(process);
 		}
-
+		let iteration = 1;
 		while (true) {
 			/* eslint-disable no-await-in-loop */
 			let rows = await cursor.readAsync(batchSize);
@@ -669,13 +692,14 @@ SELECT z."value", z."score"
 				rows = rows.map(r => r.value);
 			}
 			try {
+				if (iteration > 1 && options.interval) {
+					await sleep(options.interval);
+				}
 				await process(rows);
+				iteration += 1;
 			} catch (err) {
 				await client.release();
 				throw err;
-			}
-			if (options.interval) {
-				await sleep(options.interval);
 			}
 		}
 	};

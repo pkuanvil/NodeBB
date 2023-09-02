@@ -64,6 +64,7 @@ describe('Sorted Set methods', () => {
 				match: '*b{',
 				limit: 2,
 			});
+			assert.strictEqual(data.length, 2);
 			assert(data.includes('aaab{'));
 			assert(data.includes('bbcb{'));
 		});
@@ -73,8 +74,8 @@ describe('Sorted Set methods', () => {
 			const data = await db.getSortedSetScan({
 				key: 'scanzset4',
 				match: 'b*',
-				limit: 2,
 			});
+			assert.strictEqual(data.length, 2);
 			assert(data.includes('bbbb'));
 			assert(data.includes('bbcb'));
 		});
@@ -85,7 +86,7 @@ describe('Sorted Set methods', () => {
 				key: 'scanzset5',
 				match: '*db',
 			});
-			assert.equal(data.length, 2);
+			assert.strictEqual(data.length, 2);
 			assert(data.includes('ddb'));
 			assert(data.includes('adb'));
 		});
@@ -451,6 +452,12 @@ describe('Sorted Set methods', () => {
 					done();
 				});
 			});
+		});
+
+		it('should return elements if min/max are numeric strings', async () => {
+			await db.sortedSetAdd('zsetstringminmax', [1, 2, 3, 4, 5], ['value1', 'value2', 'value3', 'value4', 'value5']);
+			const results = await db.getSortedSetRevRangeByScore('zsetstringminmax', 0, -1, '3', '3');
+			assert.deepStrictEqual(results, ['value3']);
 		});
 	});
 
@@ -954,6 +961,28 @@ describe('Sorted Set methods', () => {
 
 				done();
 			});
+		});
+
+		it('should return members of sorted set with scores', async () => {
+			await db.sortedSetAdd('getSortedSetsMembersWithScores', [1, 2, 3], ['v1', 'v2', 'v3']);
+			const d = await db.getSortedSetMembersWithScores('getSortedSetsMembersWithScores');
+			assert.deepEqual(d, [
+				{ value: 'v1', score: 1 },
+				{ value: 'v2', score: 2 },
+				{ value: 'v3', score: 3 },
+			]);
+		});
+
+		it('should return members of multiple sorted sets with scores', async () => {
+			const d = await db.getSortedSetsMembersWithScores(
+				['doesnotexist', 'getSortedSetsMembersWithScores']
+			);
+			assert.deepEqual(d[0], []);
+			assert.deepEqual(d[1], [
+				{ value: 'v1', score: 1 },
+				{ value: 'v2', score: 2 },
+				{ value: 'v3', score: 3 },
+			]);
 		});
 	});
 

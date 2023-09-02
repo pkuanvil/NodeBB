@@ -6,10 +6,10 @@ const passportLocal = require('passport-local').Strategy;
 const BearerStrategy = require('passport-http-bearer').Strategy;
 const winston = require('winston');
 
-const meta = require('../meta');
 const controllers = require('../controllers');
 const helpers = require('../controllers/helpers');
 const plugins = require('../plugins');
+const api = require('../api');
 const { generateToken } = require('../middleware/csrf');
 
 let loginStrategies = [];
@@ -26,20 +26,6 @@ Auth.initialize = function (app, middleware) {
 
 	Auth.app = app;
 	Auth.middleware = middleware;
-
-	// Apply wrapper around passport.authenticate to pass in keepSessionInfo option
-	const _authenticate = passport.authenticate;
-	passport.authenticate = (strategy, options, callback) => {
-		if (!callback && typeof options === 'function') {
-			return _authenticate.call(passport, strategy, options);
-		}
-
-		if (!options.hasOwnProperty('keepSessionInfo')) {
-			options.keepSessionInfo = true;
-		}
-
-		return _authenticate.call(passport, strategy, options, callback);
-	};
 };
 
 Auth.setAuthVars = function setAuthVars(req) {
@@ -59,8 +45,7 @@ Auth.getLoginStrategies = function () {
 };
 
 Auth.verifyToken = async function (token, done) {
-	const { tokens = [] } = await meta.settings.get('core.api');
-	const tokenObj = tokens.find(t => t.token === token);
+	const tokenObj = await api.utils.tokens.get(token);
 	const uid = tokenObj ? tokenObj.uid : undefined;
 
 	if (uid !== undefined) {
@@ -172,7 +157,7 @@ Auth.reloadRoutes = async function (params) {
 
 	router.post('/register', middlewares, controllers.authentication.register);
 	router.post('/register/complete', middlewares, controllers.authentication.registerComplete);
-	router.post('/register/abort', Auth.middleware.applyCSRF, controllers.authentication.registerAbort);
+	router.post('/register/abort', middlewares, controllers.authentication.registerAbort);
 	router.post('/login', Auth.middleware.applyCSRF, Auth.middleware.applyBlacklist, controllers.authentication.login);
 	router.post('/logout', Auth.middleware.applyCSRF, controllers.authentication.logout);
 };

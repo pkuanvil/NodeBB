@@ -8,7 +8,6 @@ const user = require('../../user');
 const posts = require('../../posts');
 const categories = require('../../categories');
 const plugins = require('../../plugins');
-const meta = require('../../meta');
 const privileges = require('../../privileges');
 const accountHelpers = require('./helpers');
 const helpers = require('../helpers');
@@ -45,16 +44,11 @@ profileController.get = async function (req, res, next) {
 		posts.parseSignature(userData, req.uid),
 	]);
 
-	if (meta.config['reputation:disabled']) {
-		delete userData.reputation;
-	}
-
 	userData.posts = latestPosts; // for backwards compat.
 	userData.latestPosts = latestPosts;
 	userData.bestPosts = bestPosts;
 	userData.breadcrumbs = helpers.buildBreadcrumbs([{ text: userData.username }]);
 	userData.title = userData.username;
-	userData.allowCoverPicture = !userData.isSelf || !!meta.config['reputation:disabled'] || userData.reputation >= meta.config['min:rep:cover-picture'];
 
 	// Show email changed modal on first access after said change
 	userData.emailChanged = req.session.emailChanged;
@@ -65,9 +59,6 @@ profileController.get = async function (req, res, next) {
 	}
 
 	addMetaTags(res, userData);
-
-	userData.selectedGroup = userData.groups.filter(group => group && userData.groupTitleArray.includes(group.name))
-		.sort((a, b) => userData.groupTitleArray.indexOf(a.name) - userData.groupTitleArray.indexOf(b.name));
 
 	res.render('account/profile', userData);
 };
@@ -107,7 +98,7 @@ async function getPosts(callerUid, userData, setSuffix) {
 		user.isModerator(callerUid, cids),
 		privileges.categories.isUserAllowedTo('topics:schedule', cids, callerUid),
 	]);
-	const cidToIsMod = _.zipObject(cids, isModOfCids);
+	const isModOfCid = _.zipObject(cids, isModOfCids);
 	const cidToCanSchedule = _.zipObject(cids, canSchedule);
 
 	do {
@@ -125,8 +116,12 @@ async function getPosts(callerUid, userData, setSuffix) {
 			}));
 			const p = await posts.getPostSummaryByPids(pids, callerUid, { stripTags: false });
 			postData.push(...p.filter(
-				p => p && p.topic && (isAdmin || cidToIsMod[p.topic.cid] ||
-					(p.topic.scheduled && cidToCanSchedule[p.topic.cid]) || (!p.deleted && !p.topic.deleted))
+				p => p && p.topic && (
+					isAdmin ||
+					isModOfCid[p.topic.cid] ||
+					(p.topic.scheduled && cidToCanSchedule[p.topic.cid]) ||
+					(!p.deleted && !p.topic.deleted)
+				)
 			));
 		}
 		start += count;

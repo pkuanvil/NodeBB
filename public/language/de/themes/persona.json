@@ -1,0 +1,10 @@
+{
+    "settings.title": "Theme-Einstellungen",
+    "settings.intro": "Hier kannst Du Deine Theme-Einstellungen anpassen. Die Einstellungen werden auf dem aktuellen Gerät gespeichert, sodass die Einstellungen sich auf unterschiedlichen Geräten (Handy, Tablet, PC etc.) unterscheiden können.",
+    "settings.mobile-menu-side": "Menüposition der mobilen Seiten umschalten",
+    "settings.autoHidingNavbar": "Navigationsleiste bei Scrollen automatisch verbergen",
+    "settings.autoHidingNavbar-xs": "Sehr kleine Bildschirme (z. B. Handys in aufrechter Anzeige)",
+    "settings.autoHidingNavbar-sm": "Kleinere Bildschirme (z. B. Handys, manche Tablets)",
+    "settings.autoHidingNavbar-md": "Mittelgroße Bildschirme (z. B. Tablets in seitlicher Anzeige)",
+    "settings.autoHidingNavbar-lg": "Größere Bildschirme (z. B. Computer-Bildschirme)"
+}

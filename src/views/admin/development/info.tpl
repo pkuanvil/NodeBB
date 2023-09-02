@@ -1,37 +1,35 @@
 <div class="info">
-	<div class="panel panel-default">
-		<div class="panel-heading">
-			<h3 class="panel-title">[[admin/development/info:you-are-on, {host}, {port}]] &bull; [[admin/development/info:ip, {ip}]]</h3>
-		</div>
+	<div class="card">
+		<h5 class="card-header">
+			[[admin/development/info:you-are-on, {host}, {port}]] &bull; [[admin/development/info:ip, {ip}]]
+		</h5>
 
-		<div class="panel-body">
+		<div class="card-body">
 			<span>[[admin/development/info:nodes-responded, {nodeCount}, {timeout}]]</span>
 
-			<table class="table table-striped">
+			<table class="table table-sm text-sm">
 				<thead>
 					<tr>
-						<td>[[admin/development/info:host]]</td>
-						<td class="text-center">[[admin/development/info:primary]]</td>
-						<td>[[admin/development/info:pid]]</td>
-						<td>[[admin/development/info:nodejs]]</td>
-						<td>[[admin/development/info:online]]</td>
-						<td>[[admin/development/info:git]]</td>
-						<td>[[admin/development/info:cpu-usage]]</td>
-						<td>[[admin/development/info:process-memory]]</td>
-						<td>[[admin/development/info:system-memory]]</td>
-						<td>[[admin/development/info:load]]</td>
-						<td>[[admin/development/info:uptime]]</td>
+						<td class="fw-bold">[[admin/development/info:host]]</td>
+						<td class="fw-bold text-center">[[admin/development/info:primary]]</td>
+						<td class="fw-bold">[[admin/development/info:nodejs]]</td>
+						<td class="fw-bold">[[admin/development/info:online]]</td>
+						<td class="fw-bold">[[admin/development/info:git]]</td>
+						<td class="fw-bold">[[admin/development/info:cpu-usage]]</td>
+						<td class="fw-bold">[[admin/development/info:process-memory]]</td>
+						<td class="fw-bold">[[admin/development/info:system-memory]]</td>
+						<td class="fw-bold">[[admin/development/info:load]]</td>
+						<td class="fw-bold">[[admin/development/info:uptime]]</td>
 					</tr>
 				</thead>
-				<tbody>
-				<!-- BEGIN info -->
+				<tbody class="text-xs">
+				{{{ each info }}}
 				<tr>
 					<td>{info.os.hostname}:{info.process.port}</td>
 					<td class="text-center">
 						{{{if info.nodebb.isPrimary}}}<i class="fa fa-check"></i>{{{else}}}<i class="fa fa-times"></i>{{{end}}} /
 						{{{if info.nodebb.runJobs}}}<i class="fa fa-check"></i>{{{else}}}<i class="fa fa-times"></i>{{{end}}}
 					</td>
-					<td>{info.process.pid}</td>
 					<td>{info.process.version}</td>
 					<td>
 						<span title="[[admin/development/info:registered]]">{info.stats.onlineRegisteredCount}</span> /
@@ -50,20 +48,19 @@
 					<td>{info.os.load}</td>
 					<td>{info.process.uptimeHumanReadable}</td>
 				</tr>
-				<!-- END info -->
+				{{{ end }}}
 				</tbody>
 			</table>
 			</div>
 		</div>
 	</div>
 
-	<div class="panel panel-default">
-		<div class="panel-heading">
-			<h3 class="panel-title">[[admin/development/info:info]]</h3>
-		</div>
-
-		<div class="panel-body">
-			<div class="highlight">
+	<div class="card">
+		<h5 class="card-header">
+			[[admin/development/info:info]]
+		</h5>
+		<div class="card-body">
+			<div class="p-3 text-bg-light border border-secondary rounded">
 				<pre>{infoJSON}</pre>
 			</div>
 		</div>

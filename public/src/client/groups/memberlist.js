@@ -22,7 +22,8 @@ define('forum/groups/memberlist', ['api', 'bootbox', 'alerts'], function (api, b
 					title: '[[groups:details.add-member]]',
 					message: html,
 					buttons: {
-						ok: {
+						OK: {
+							label: '[[groups:details.add-member]]',
 							callback: function () {
 								const users = [];
 								modal.find('[data-uid][data-selected]').each(function (index, el) {
@@ -107,7 +108,7 @@ define('forum/groups/memberlist', ['api', 'bootbox', 'alerts'], function (api, b
 	}
 
 	function handleMemberInfiniteScroll() {
-		$('[component="groups/members"] tbody').on('scroll', function () {
+		$('[component="groups/members"]').on('scroll', function () {
 			const $this = $(this);
 			const bottom = ($this[0].scrollHeight - $this.innerHeight()) * 0.9;
 

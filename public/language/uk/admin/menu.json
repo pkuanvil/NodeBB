@@ -14,6 +14,7 @@
 	"manage/users": "Користувачі",
 	"manage/admins-mods": "Адміністратори та моди",
 	"manage/registration": "Черга реєстрації",
+	"manage/flagged-content": "Flagged Content",
 	"manage/post-queue": "Черга Постів",
 	"manage/groups": "Групи",
 	"manage/ip-blacklist": "Чорний список IP-адрес",
@@ -72,7 +73,9 @@
 	"development/info": "Інформація",
 
 	"rebuild-and-restart-forum": "Перебудувати & Перезавантажити Форум",
+	"rebuild-and-restart": "Rebuild & Restart",
 	"restart-forum": "Перезавантажити форум",
+	"restart": "Restart",
 	"logout": "Вийти",
 	"view-forum": "Переглянути форум",
 

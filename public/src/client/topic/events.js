@@ -9,9 +9,8 @@ define('forum/topic/events', [
 	'forum/topic/images',
 	'components',
 	'translator',
-	'benchpress',
 	'hooks',
-], function (postTools, threadTools, posts, images, components, translator, Benchpress, hooks) {
+], function (postTools, threadTools, posts, images, components, translator, hooks) {
 	const Events = {};
 
 	const events = {
@@ -107,8 +106,8 @@ define('forum/topic/events', [
 		const editedPostEl = components.get('post/content', data.post.pid).filter(function (index, el) {
 			return parseInt($(el).closest('[data-pid]').attr('data-pid'), 10) === parseInt(data.post.pid, 10);
 		});
-
-		const editorEl = $('[data-pid="' + data.post.pid + '"] [component="post/editor"]').filter(function (index, el) {
+		const postContainer = $(`[data-pid="${data.post.pid}"]`);
+		const editorEl = postContainer.find('[component="post/editor"]').filter(function (index, el) {
 			return parseInt($(el).closest('[data-pid]').attr('data-pid'), 10) === parseInt(data.post.pid, 10);
 		});
 		const topicTitle = components.get('topic/title');
@@ -138,33 +137,34 @@ define('forum/topic/events', [
 		if (data.post.changed) {
 			editedPostEl.fadeOut(250, function () {
 				editedPostEl.html(translator.unescape(data.post.content));
-				editedPostEl.find('img:not(.not-responsive)').addClass('img-responsive');
+				editedPostEl.find('img:not(.not-responsive)').addClass('img-fluid');
 				images.wrapImagesInLinks(editedPostEl.parent());
 				posts.addBlockquoteEllipses(editedPostEl.parent());
 				editedPostEl.fadeIn(250);
 
-				const editData = {
-					editor: data.editor,
-					editedISO: utils.toISOString(data.post.edited),
-				};
+				if (data.post.edited) {
+					const editData = {
+						editor: data.editor,
+						editedISO: utils.toISOString(data.post.edited),
+					};
 
-				app.parseAndTranslate('partials/topic/post-editor', editData, function (html) {
-					editorEl.replaceWith(html);
-					$('[data-pid="' + data.post.pid + '"] [component="post/editor"] .timeago').timeago();
-					hooks.fire('action:posts.edited', data);
-				});
+					app.parseAndTranslate('partials/topic/post-editor', editData, function (html) {
+						editorEl.replaceWith(html);
+						postContainer.find('[component="post/edit-indicator"]')
+							.removeClass('hidden')
+							.translateAttr('title', `[[global:edited-timestamp, ${editData.editedISO}]]`);
+						postContainer.find('[component="post/editor"] .timeago').timeago();
+						hooks.fire('action:posts.edited', data);
+					});
+				}
 			});
 		} else {
 			hooks.fire('action:posts.edited', data);
 		}
 
 		if (data.topic.tags && data.topic.tagsupdated) {
-			Benchpress.render('partials/topic/tags', { tags: data.topic.tags }).then(function (html) {
-				const tags = $('.tags');
-
-				tags.fadeOut(250, function () {
-					tags.html(html).fadeIn(250);
-				});
+			require(['forum/topic/tag'], function (tag) {
+				tag.updateTopicTags([data.topic]);
 			});
 		}
 

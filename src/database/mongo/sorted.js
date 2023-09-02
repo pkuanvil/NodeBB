@@ -49,15 +49,15 @@ module.exports = function (module) {
 		}
 
 		if (min !== '-inf') {
-			query.score = { $gte: min };
+			query.score = { $gte: parseFloat(min) };
 		}
 		if (max !== '+inf') {
 			query.score = query.score || {};
-			query.score.$lte = max;
+			query.score.$lte = parseFloat(max);
 		}
 
 		if (max === min) {
-			query.score = max;
+			query.score = parseFloat(max);
 		}
 
 		const fields = { _id: 0, _key: 0 };
@@ -84,7 +84,9 @@ module.exports = function (module) {
 
 		let result = [];
 		async function doQuery(_key, fields, skip, limit) {
-			return await module.client.collection('objects').find({ ...query, ...{ _key: _key } }, { projection: fields })
+			return await module.client.collection('objects').find({
+				...query, ...{ _key: _key },
+			}, { projection: fields })
 				.sort({ score: sort })
 				.skip(skip)
 				.limit(limit)
@@ -363,34 +365,59 @@ module.exports = function (module) {
 	};
 
 	module.getSortedSetMembers = async function (key) {
-		const data = await module.getSortedSetsMembers([key]);
+		const data = await getSortedSetsMembersWithScores([key], false);
+		return data && data[0];
+	};
+
+	module.getSortedSetMembersWithScores = async function (key) {
+		const data = await getSortedSetsMembersWithScores([key], true);
 		return data && data[0];
 	};
 
 	module.getSortedSetsMembers = async function (keys) {
+		return await getSortedSetsMembersWithScores(keys, false);
+	};
+
+	module.getSortedSetsMembersWithScores = async function (keys) {
+		return await getSortedSetsMembersWithScores(keys, true);
+	};
+
+	async function getSortedSetsMembersWithScores(keys, withScores) {
 		if (!Array.isArray(keys) || !keys.length) {
 			return [];
 		}
 		const arrayOfKeys = keys.length > 1;
 		const projection = { _id: 0, value: 1 };
+		if (withScores) {
+			projection.score = 1;
+		}
 		if (arrayOfKeys) {
 			projection._key = 1;
 		}
 		const data = await module.client.collection('objects').find({
 			_key: arrayOfKeys ? { $in: keys } : keys[0],
-		}, { projection: projection }).toArray();
+		}, { projection: projection })
+			.sort({ score: 1 })
+			.toArray();
 
 		if (!arrayOfKeys) {
-			return [data.map(item => item.value)];
+			return [withScores ?
+				data.map(i => ({ value: i.value, score: i.score })) :
+				data.map(item => item.value),
+			];
 		}
 		const sets = {};
 		data.forEach((item) => {
 			sets[item._key] = sets[item._key] || [];
-			sets[item._key].push(item.value);
+			if (withScores) {
+				sets[item._key].push({ value: item.value, score: item.score });
+			} else {
+				sets[item._key].push(item.value);
+			}
 		});
 
 		return keys.map(k => sets[k] || []);
-	};
+	}
 
 	module.sortedSetIncrBy = async function (key, increment, value) {
 		if (!key) {
@@ -416,7 +443,8 @@ module.exports = function (module) {
 			// https://github.com/NodeBB/NodeBB/issues/4467
 			// https://jira.mongodb.org/browse/SERVER-14322
 			// https://docs.mongodb.org/manual/reference/command/findAndModify/#upsert-and-unique-index
-			if (err && err.message.startsWith('E11000 duplicate key error')) {
+			if (err && err.message.includes('E11000 duplicate key error')) {
+				console.log(new Error('e11000').stack, key, increment, value);
 				return await module.sortedSetIncrBy(key, increment, value);
 			}
 			throw err;
@@ -535,18 +563,18 @@ module.exports = function (module) {
 		let done = false;
 		const ids = [];
 		const project = { _id: 0, _key: 0 };
-
+		const sort = options.reverse ? -1 : 1;
 		if (!options.withScores) {
 			project.score = 0;
 		}
 		const cursor = await module.client.collection('objects').find({ _key: setKey }, { projection: project })
-			.sort({ score: 1 })
+			.sort({ score: sort })
 			.batchSize(options.batch);
 
 		if (processFn && processFn.constructor && processFn.constructor.name !== 'AsyncFunction') {
 			processFn = util.promisify(processFn);
 		}
-
+		let iteration = 1;
 		while (!done) {
 			/* eslint-disable no-await-in-loop */
 			const item = await cursor.next();
@@ -557,12 +585,12 @@ module.exports = function (module) {
 			}
 
 			if (ids.length >= options.batch || (done && ids.length !== 0)) {
-				await processFn(ids);
-
-				ids.length = 0;
-				if (options.interval) {
+				if (iteration > 1 && options.interval) {
 					await sleep(options.interval);
 				}
+				await processFn(ids);
+				iteration += 1;
+				ids.length = 0;
 			}
 		}
 	};
