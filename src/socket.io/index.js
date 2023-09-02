@@ -13,6 +13,7 @@ const logger = require('../logger');
 const plugins = require('../plugins');
 const ratelimit = require('../middleware/ratelimit');
 const blacklist = require('../meta/blacklist');
+const groups = require('../groups');
 
 const Namespaces = Object.create(null);
 

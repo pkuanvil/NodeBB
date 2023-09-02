@@ -400,6 +400,9 @@ authenticationController.onSuccessfulLogin = async function (req, uid) {
 	}
 };
 
+const regenerateAsync = util.promisify((req, callback) => req.session.regenerate(callback));
+const logoutAsync = util.promisify((req, callback) => req.logout(callback));
+
 authenticationController.localLogin = async function (req, username, password, next) {
 	if (!username) {
 		return next(new Error('[[error:invalid-username]]'));
@@ -442,7 +445,7 @@ authenticationController.localLogin = async function (req, username, password, n
 		} catch (e) {
 			if (req.loggedIn) {
 				await logoutAsync(req);
-				await destroyAsync(req);
+				await regenerateAsync(req);
 			}
 			throw e;
 		}
@@ -452,9 +455,6 @@ authenticationController.localLogin = async function (req, username, password, n
 		next(err);
 	}
 };
-
-const regenerateAsync = util.promisify((req, callback) => req.session.regenerate(callback));
-const logoutAsync = util.promisify((req, callback) => req.logout(callback));
 
 authenticationController.logout = async function (req, res, next) {
 	if (!req.loggedIn || !req.sessionID) {
