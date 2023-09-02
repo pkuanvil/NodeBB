@@ -154,10 +154,9 @@ helpers.notAllowed = async function (req, res, error) {
 			});
 		}
 	} else if (res.locals.isAPI) {
-		req.session.returnTo = req.url.replace(/^\/api/, '');
+		// @pkuanvil: don't store anything (like returnTo) in guest session
 		helpers.formatApiResponse(401, res, error);
 	} else {
-		req.session.returnTo = req.url;
 		res.redirect(`${relative_path}/login${req.path.startsWith('/admin') ? '?local=1' : ''}`);
 	}
 };
@@ -453,6 +452,7 @@ helpers.formatApiResponse = async (statusCode, res, payload) => {
 	}
 
 	if (String(statusCode).startsWith('2')) {
+		// @pkuanvil:
 		if (res.req.loggedIn) {
 			res.set('cache-control', 'private');
 		}

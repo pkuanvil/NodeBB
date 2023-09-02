@@ -162,7 +162,7 @@ Controllers.register = async function (req, res, next) {
 			}
 		}
 
-		if (returnTo) {
+		if (req.loggedIn && returnTo) {
 			req.session.returnTo = returnTo;
 		}
 
