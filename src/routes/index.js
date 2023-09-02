@@ -88,8 +88,7 @@ _mounts.category = (app, name, middleware, controllers) => {
 };
 
 _mounts.users = (app, name, middleware, controllers) => {
-	// @pkuanvil restrict users list to admin
-	const middlewares = [middleware.admin.checkPrivileges];
+	const middlewares = [middleware.canViewUsers];
 
 	setupPageRoute(app, `/${name}`, middlewares, controllers.users.index);
 };
