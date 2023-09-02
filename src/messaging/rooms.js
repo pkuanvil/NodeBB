@@ -440,12 +440,13 @@ module.exports = function (Messaging) {
 
 	Messaging.loadRoom = async (uid, data) => {
 		const { roomId } = data;
-		const [room, inRoom, canChat, isAdmin, isGlobalMod] = await Promise.all([
+		const [room, inRoom, canChat, isAdmin, isGlobalMod, status] = await Promise.all([
 			Messaging.getRoomData(roomId),
 			Messaging.isUserInRoom(uid, roomId),
 			privileges.global.can('chat', uid),
 			user.isAdministrator(uid),
 			user.isGlobalModerator(uid),
+			user.getUserField(uid, 'status'),
 		]);
 
 		if (!canChat) {
@@ -462,6 +463,10 @@ module.exports = function (Messaging) {
 
 		// add user to public room onload
 		if (room.public && !inRoom) {
+			// @pkuanvil: throw an Error if an "invisible" user try to join a public room
+			if (status === 'offline') {
+				throw new Error('[[error:pr-chat-join-public-when-offline]]');
+			}
 			await addUidsToRoom([uid], roomId);
 			room.userCount += 1;
 		} else if (inRoom) {

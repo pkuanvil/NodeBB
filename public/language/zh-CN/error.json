@@ -153,6 +153,7 @@
     "cant-chat-with-yourself": "您不能和自己聊天！",
     "chat-restricted": "此用户限制了他的聊天消息。必须他先关注您，您才能和他聊天。",
     "chat-disabled": "聊天系统已关闭",
+    "pr-chat-join-public-when-offline": "加入您未加入的公开房间会暴露您的在线状态。您必须先解除隐身状态以后才能加入公开房间",
     "too-many-messages": "您发送了太多消息，请稍等片刻。",
     "invalid-chat-message": "无效的聊天信息",
     "chat-message-too-long": "聊天消息不能超过 %1  个字符。",

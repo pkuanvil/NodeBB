@@ -513,7 +513,8 @@ define('forum/chats', [
 		fetch(dataUrl, { credentials: 'include' })
 			.then(async function (response) {
 				if (!response.ok) {
-					return console.warn('[search] Received ' + response.status);
+					const payload = await response.json();
+					alerts.error(payload.error);
 				}
 				const payload = await response.json();
 				const html = await app.parseAndTranslate('partials/chats/message-window', payload);
