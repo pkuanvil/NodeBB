@@ -1,7 +1,6 @@
 'use strict';
 
 const assert = require('assert');
-const async = require('async');
 const request = require('request-promise-native');
 const nconf = require('nconf');
 const util = require('util');
@@ -111,6 +110,28 @@ describe('Messaging Library', () => {
 					assert.ifError(err);
 					done();
 				});
+			});
+		});
+
+		it('should not allow messaging room if user is muted', async () => {
+			const twoMinutesFromNow = Date.now() + (2 * 60 * 1000);
+			const twoHoursFromNow = Date.now() + (2 * 60 * 60 * 1000);
+			const roomId = 0;
+
+			await User.setUserField(mocks.users.herp.uid, 'mutedUntil', twoMinutesFromNow);
+			await assert.rejects(Messaging.canMessageRoom(mocks.users.herp.uid, roomId), (err) => {
+				assert(err.message.startsWith('[[error:user-muted-for-minutes,'));
+				return true;
+			});
+
+			await User.setUserField(mocks.users.herp.uid, 'mutedUntil', twoHoursFromNow);
+			await assert.rejects(Messaging.canMessageRoom(mocks.users.herp.uid, roomId), (err) => {
+				assert(err.message.startsWith('[[error:user-muted-for-hours,'));
+				return true;
+			});
+			await db.deleteObjectField(`user:${mocks.users.herp.uid}`, 'mutedUntil');
+			await assert.rejects(Messaging.canMessageRoom(mocks.users.herp.uid, roomId), {
+				message: '[[error:no-room]]',
 			});
 		});
 	});
@@ -347,7 +368,6 @@ describe('Messaging Library', () => {
 		});
 
 		it('should fail to send second message due to rate limit', async () => {
-			const socketMock = { uid: mocks.users.foo.uid };
 			const oldValue = meta.config.chatMessageDelay;
 			meta.config.chatMessageDelay = 1000;
 
@@ -550,6 +570,55 @@ describe('Messaging Library', () => {
 		});
 	});
 
+	describe('toMid', () => {
+		let roomId;
+		let firstMid;
+		before(async () => {
+			// create room
+			const { body } = await callv3API('post', `/chats`, {
+				uids: [mocks.users.bar.uid],
+			}, 'foo');
+			roomId = body.response.roomId;
+			// send message
+			const result = await callv3API('post', `/chats/${roomId}`, {
+				roomId: roomId,
+				message: 'first chat message',
+			}, 'foo');
+
+			firstMid = result.body.response.mid;
+		});
+
+		it('should fail if toMid is not a number', async () => {
+			const result = await callv3API('post', `/chats/${roomId}`, {
+				roomId: roomId,
+				message: 'invalid',
+				toMid: 'osmaosd',
+			}, 'foo');
+			assert.strictEqual(result.body.status.message, 'Invalid Chat Message ID');
+		});
+
+		it('should reply to firstMid using toMid', async () => {
+			const { body } = await callv3API('post', `/chats/${roomId}`, {
+				roomId: roomId,
+				message: 'invalid',
+				toMid: firstMid,
+			}, 'bar');
+			assert(body.response.mid);
+		});
+
+		it('should fail if user can not view toMid', async () => {
+			// add new user
+			await callv3API('post', `/chats/${roomId}/users`, { uids: [mocks.users.herp.uid] }, 'foo');
+			// try to reply to firstMid that this user cant see
+			const { body } = await callv3API('post', `/chats/${roomId}`, {
+				roomId: roomId,
+				message: 'invalid',
+				toMid: firstMid,
+			}, 'herp');
+			assert.strictEqual(body.status.message, 'You do not have enough privileges for this action.');
+		});
+	});
+
 	describe('edit/delete', () => {
 		const socketModules = require('../src/socket.io/modules');
 		let mid;
@@ -637,6 +706,13 @@ describe('Messaging Library', () => {
 			});
 		});
 
+		it('should not show deleted message to other users', async () => {
+			const { body } = await callv3API('get', `/chats/${roomId}/messages/${mid}`, {}, 'herp');
+			const message = body.response;
+			assert.strictEqual(message.deleted, 1);
+			assert.strictEqual(message.content, '<p>[[modules:chat.message-deleted]]</p>');
+		});
+
 		it('should error out if a message is deleted again', async () => {
 			const { statusCode, body } = await callv3API('delete', `/chats/${roomId}/messages/${mid}`, {}, 'foo');
 			assert.strictEqual(statusCode, 400);
@@ -697,7 +773,7 @@ describe('Messaging Library', () => {
 			assert.equal(response.statusCode, 404);
 		});
 
-		it('should 500 for guest with no privilege error', async () => {
+		it('should 401 for guest with not-authorised status code', async () => {
 			meta.config.disableChat = 0;
 			const response = await request(`${nconf.get('url')}/api/user/baz/chats`, {
 				resolveWithFullResponse: true,
@@ -706,8 +782,8 @@ describe('Messaging Library', () => {
 			});
 			const { body } = response;
 
-			assert.equal(response.statusCode, 500);
-			assert.equal(body.error, '[[error:no-privileges]]');
+			assert.equal(response.statusCode, 401);
+			assert.equal(body.status.code, 'not-authorised');
 		});
 
 		it('should 404 for non-existent user', async () => {
@@ -737,7 +813,7 @@ describe('Messaging Library', () => {
 
 			assert.equal(response.statusCode, 200);
 			assert(Array.isArray(body.rooms));
-			assert.equal(body.rooms.length, 2);
+			assert.equal(body.rooms.length, 3);
 			assert.equal(body.title, '[[pages:chats]]');
 		});
 

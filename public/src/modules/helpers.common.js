@@ -327,7 +327,7 @@ module.exports = function (utils, Benchpress, relative_path) {
 	}
 
 	function increment(value, inc) {
-		return value + parseInt(inc, 10);
+		return String(value + parseInt(inc, 10));
 	}
 
 	function generateRepliedTo(post, timeagoCutoff) {
