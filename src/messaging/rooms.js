@@ -48,9 +48,7 @@ module.exports = function (Messaging) {
 				db.parseIntFields(data, intFields, fields);
 				data.roomName = validator.escape(String(data.roomName || ''));
 				data.public = parseInt(data.public, 10) === 1;
-				if (data.hasOwnProperty('groupChat')) {
-					data.groupChat = parseInt(data.groupChat, 10) === 1;
-				}
+				data.groupChat = data.userCount > 2;
 
 				if (!fields.length || fields.includes('notificationSetting')) {
 					data.notificationSetting = data.notificationSetting ||
@@ -443,7 +441,7 @@ module.exports = function (Messaging) {
 		const [room, inRoom, canChat, isAdmin, isGlobalMod, status] = await Promise.all([
 			Messaging.getRoomData(roomId),
 			Messaging.isUserInRoom(uid, roomId),
-			privileges.global.can('chat', uid),
+			privileges.global.can(['chat', 'chat:privileged'], uid),
 			user.isAdministrator(uid),
 			user.isGlobalModerator(uid),
 			user.getUserField(uid, 'status'),
@@ -457,7 +455,7 @@ module.exports = function (Messaging) {
 		) {
 			return null;
 		}
-		if (!canChat) {
+		if (!canChat.includes(true)) {
 			throw new Error('[[error:no-privileges]]');
 		}
 
@@ -528,7 +526,7 @@ module.exports = function (Messaging) {
 		room.isOwner = isOwner;
 		room.users = users;
 		room.canReply = canReply;
-		room.groupChat = room.hasOwnProperty('groupChat') ? room.groupChat : users.length > 2;
+		room.groupChat = users.length > 2;
 		room.icon = Messaging.getRoomIcon(room);
 		room.usernames = Messaging.generateUsernames(room, uid);
 		room.chatWithMessage = await Messaging.generateChatWithMessage(room, uid, settings.userLang);
@@ -539,6 +537,7 @@ module.exports = function (Messaging) {
 		room.isAdmin = isAdmin;
 		room.notificationOptions = notifOptions.options;
 		room.notificationOptionsIcon = notifOptions.selectedIcon;
+		room.composerActions = [];
 
 		const payload = await plugins.hooks.fire('filter:messaging.loadRoom', { uid, data, room });
 		return payload.room;

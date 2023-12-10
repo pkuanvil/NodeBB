@@ -17,6 +17,7 @@ ajaxify.widgets = { render: render };
 
 	ajaxify.count = 0;
 	ajaxify.currentPage = null;
+	ajaxify.requestedPage = null;
 	// disables scroll to top when back button is clicked
 	// https://developer.chrome.com/blog/history-api-scroll-restoration/
 	if ('scrollRestoration' in history) {
@@ -38,10 +39,11 @@ ajaxify.widgets = { render: render };
 		}
 
 		// Abort subsequent requests if clicked multiple times within a short window of time
-		if (ajaxifyTimer && (Date.now() - ajaxifyTimer) < 500) {
+		if (ajaxify.requestedPage === url && ajaxifyTimer && (Date.now() - ajaxifyTimer) < 500) {
 			return true;
 		}
 		ajaxifyTimer = Date.now();
+		ajaxify.requestedPage = url;
 
 		if (ajaxify.handleRedirects(url)) {
 			return true;
@@ -134,6 +136,7 @@ ajaxify.widgets = { render: render };
 
 	ajaxify.updateHistory = function (url, quiet) {
 		ajaxify.currentPage = url.split(/[?#]/)[0];
+		ajaxify.requestedPage = null;
 		if (window.history && window.history.pushState) {
 			window.history[!quiet ? 'pushState' : 'replaceState']({
 				url: url,
@@ -157,13 +160,14 @@ ajaxify.widgets = { render: render };
 					status = 500;
 				}
 				if (data.responseJSON) {
+					ajaxify.data.bodyClass = data.responseJSON.bodyClass;
 					data.responseJSON.config = config;
 				}
 
 				$('#footer, #content').removeClass('hide').addClass('ajaxifying');
 				return renderTemplate(url, status.toString(), data.responseJSON || {}, callback);
 			} else if (status === 401) {
-				alerts.error('[[global:please_log_in]]');
+				alerts.error('[[global:please-log-in]]');
 				app.previousUrl = url;
 				window.location.href = config.relative_path + '/login';
 			} else if (status === 302 || status === 308) {

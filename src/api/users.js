@@ -1,6 +1,5 @@
 'use strict';
 
-const util = require('util');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -164,11 +163,11 @@ usersAPI.follow = async function (caller, data) {
 
 	const notifObj = await notifications.create({
 		type: 'follow',
-		bodyShort: `[[notifications:user_started_following_you, ${displayname}]]`,
+		bodyShort: `[[notifications:user-started-following-you, ${displayname}]]`,
 		nid: `follow:${data.uid}:uid:${caller.uid}`,
 		from: caller.uid,
 		path: `/uid/${data.uid}/followers`,
-		mergeId: 'notifications:user_started_following_you',
+		mergeId: 'notifications:user-started-following-you',
 	});
 	if (!notifObj) {
 		return;
@@ -330,10 +329,6 @@ usersAPI.deleteToken = async (caller, { uid, token }) => {
 	return true;
 };
 
-const getSessionAsync = util.promisify((sid, callback) => {
-	db.sessionStore.get(sid, (err, sessionObj) => callback(err, sessionObj || null));
-});
-
 usersAPI.revokeSession = async (caller, { uid, uuid }) => {
 	// Only admins or global mods (besides the user themselves) can revoke sessions
 	if (parseInt(uid, 10) !== caller.uid && !await user.isAdminOrGlobalMod(caller.uid)) {
@@ -344,7 +339,7 @@ usersAPI.revokeSession = async (caller, { uid, uuid }) => {
 	let _id;
 	for (const sid of sids) {
 		/* eslint-disable no-await-in-loop */
-		const sessionObj = await getSessionAsync(sid);
+		const sessionObj = await db.sessionStoreGet(sid);
 		if (sessionObj && sessionObj.meta && sessionObj.meta.uuid === uuid) {
 			_id = sid;
 			break;
@@ -413,10 +408,9 @@ usersAPI.getInviteGroups = async (caller, { uid }) => {
 };
 
 usersAPI.addEmail = async (caller, { email, skipConfirmation, uid }) => {
-	const canManageUsers = await privileges.admin.can('admin:users', caller.uid);
-	skipConfirmation = canManageUsers && skipConfirmation;
-
-	if (skipConfirmation) {
+	const isSelf = parseInt(caller.uid, 10) === parseInt(uid, 10);
+	const canEdit = await privileges.users.canEdit(caller.uid, uid);
+	if (skipConfirmation && canEdit && !isSelf) {
 		if (!email.length) {
 			await user.email.remove(uid);
 		} else {
