@@ -202,6 +202,7 @@
     "consent.export-posts": "导出帖子 (.csv)",
     "consent.export-posts-success": "帖子导出完成后，您将会收到一条通知。",
     "emailUpdate.intro": "请在下方输入您的电子邮箱地址。此论坛使用您的电子邮箱地址用于定时发送摘要和通知，以及用于忘记密码时找回账号。",
+    "pr_emailUpdate.intro": "请在下方输入您的电子邮箱地址。此论坛使用您的电子邮箱地址用于定时发送摘要和通知，以及用于忘记密码时找回账号。<strong>只有您点击此电子邮箱地址中收到的验证链接以后，此邮箱才有效。</strong>",
     "emailUpdate.optional": "<strong>此项为可选</strong>。您不必提供您的电子邮件地址，但如果没有一个经过验证的电子邮件地址，您将无法恢复您的账号或使用电子邮件登录。",
     "emailUpdate.required": "<strong>此字段为必填</strong>。",
     "emailUpdate.change-instructions": "将向输入的电子邮箱地址发送一封带有唯一链接的确认电子邮件。访问该链接将验证您对该电子邮箱的所有权，它将在您的账号上处于活动状态。在任何时候，您都可以在您的账号页面更新存档的电子邮箱地址。",
