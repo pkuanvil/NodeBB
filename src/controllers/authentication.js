@@ -217,11 +217,15 @@ authenticationController.registerAbort = async (req, res) => {
 		// Email is the only cancelable interstitial
 		delete req.session.registration.updateEmail;
 
+		// @pkuanvil: registered users should not have remaining interstitials other than email.
+		// In case they do have, we don't throw their session away...
 		const { interstitials } = await user.interstitials.get(req, req.session.registration);
 		if (!interstitials.length) {
 			delete req.session.registration;
-			return res.redirect(nconf.get('relative_path') + (req.session.returnTo || '/'));
+		} else {
+			winston.warn(`[auth] uid ${req.uid} have remaining interstitials!`);
 		}
+		return res.redirect(nconf.get('relative_path') + (req.session.returnTo || '/'));
 	}
 
 	// End the session and redirect to home
