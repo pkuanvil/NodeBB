@@ -42,12 +42,15 @@ privsTopics.get = async function (tid, uid) {
 		'topics:schedule': privData['topics:schedule'] || isAdministrator,
 		'topics:tag': privData['topics:tag'] || isAdministrator,
 		'topics:delete': (privData['topics:delete'] && (isOwner || isModerator)) || isAdministrator,
-		'posts:edit': (privData['posts:edit'] && (!topicData.locked || isModerator)) || isAdministrator,
+		// @pkuanvil: hardcode topic owner allow for now
+		'posts:edit': (privData['posts:edit'] && (!topicData.locked || isModerator)) || isOwner || isAdministrator,
 		'posts:history': privData['posts:history'] || isAdministrator,
 		'posts:upvote': privData['posts:upvote'] || isAdministrator,
 		'posts:downvote': privData['posts:downvote'] || isAdministrator,
-		'posts:delete': (privData['posts:delete'] && (!topicData.locked || isModerator)) || isAdministrator,
-		'posts:view_deleted': privData['posts:view_deleted'] || isAdministrator,
+		// @pkuanvil: hardcode topic owner allow for now
+		'posts:delete': (privData['posts:delete'] && (!topicData.locked || isModerator)) || isOwner || isAdministrator,
+		// @pkuanvil: hardcode topic owner allow for now
+		'posts:view_deleted': privData['posts:view_deleted'] || isOwner || isAdministrator,
 		read: privData.read || isAdministrator,
 		purge: (privData.purge && (isOwner || isModerator)) || isAdministrator,
 

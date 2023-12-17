@@ -197,7 +197,8 @@ define('forum/topic/events', [
 		const isDeleted = postEl.hasClass('deleted');
 		postTools.toggle(data.pid, isDeleted);
 
-		if (!ajaxify.data.privileges.isAdminOrMod && parseInt(data.uid, 10) !== parseInt(app.user.uid, 10)) {
+		// @pkuanvil: Change priv to view_deleted
+		if (!ajaxify.data.privileges.view_deleted && parseInt(data.uid, 10) !== parseInt(app.user.uid, 10)) {
 			postEl.find('[component="post/tools"]').toggleClass('hidden', isDeleted);
 			if (isDeleted) {
 				postEl.find('[component="post/content"]').translateHtml('[[topic:post-is-deleted]]');

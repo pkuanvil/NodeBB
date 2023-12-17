@@ -154,6 +154,11 @@ privsPosts.canEdit = async function (pid, uid) {
 		return { flag: false, message: '[[error:post-deleted]]' };
 	}
 
+	// @pkuanvil: hardcode topic owner allow for now
+	if (await topics.isOwner(results.postData.tid, uid)) {
+		return { flag: true };
+	}
+
 	results.pid = parseInt(pid, 10);
 	results.uid = uid;
 
@@ -182,6 +187,10 @@ privsPosts.canDelete = async function (pid, uid) {
 	const { postDeleteDuration } = meta.config;
 	if (!results.isMod && postDeleteDuration && (Date.now() - postData.timestamp > postDeleteDuration * 1000)) {
 		return { flag: false, message: `[[error:post-delete-duration-expired, ${meta.config.postDeleteDuration}]]` };
+	}
+	// @pkuanvil: hardcode topic owner allow for now
+	if (await topics.isOwner(postData.tid, uid)) {
+		return { flag: true };
 	}
 	const { deleterUid } = postData;
 	const flag = results['posts:delete'] && ((results.isOwner && (deleterUid === 0 || deleterUid === postData.uid)) || results.isMod);
@@ -221,7 +230,12 @@ privsPosts.canPurge = async function (pid, uid) {
 		owner: posts.isOwner(pid, uid),
 		isAdmin: user.isAdministrator(uid),
 		isModerator: user.isModerator(uid, cid),
+		postData: posts.getPostFields(pid, ['tid']),
 	});
+	// @pkuanvil: hardcode topic owner allow for now
+	if (await topics.isOwner(results.postData.tid, uid)) {
+		return { flag: true };
+	}
 	return (results.purge && (results.owner || results.isModerator)) || results.isAdmin;
 };
 

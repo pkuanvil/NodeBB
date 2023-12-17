@@ -160,14 +160,18 @@ module.exports = function (Topics) {
 		topicData.posts.forEach((post) => {
 			if (post) {
 				post.topicOwnerPost = parseInt(topicData.uid, 10) === parseInt(post.uid, 10);
-				post.display_edit_tools = topicPrivileges.isAdminOrMod || (post.selfPost && topicPrivileges['posts:edit']);
-				post.display_delete_tools = topicPrivileges.isAdminOrMod || (post.selfPost && topicPrivileges['posts:delete']);
+				// @pkuanvil: hardcode topic owner allow for now
+				post.display_edit_tools = topicPrivileges.isAdminOrMod || (topicPrivileges['posts:edit']);
+				// @pkuanvil: hardcode topic owner allow for now
+				post.display_delete_tools = topicPrivileges.isAdminOrMod || (topicPrivileges['posts:delete']);
 				post.display_moderator_tools = post.display_edit_tools || post.display_delete_tools;
 				post.display_move_tools = topicPrivileges.isAdminOrMod && post.index !== 0;
 				post.display_post_menu = topicPrivileges.isAdminOrMod ||
 					(post.selfPost && !topicData.locked && !post.deleted) ||
 					(post.selfPost && post.deleted && parseInt(post.deleterUid, 10) === parseInt(topicPrivileges.uid, 10)) ||
-					((loggedIn || topicData.postSharing.length) && !post.deleted);
+					((loggedIn || topicData.postSharing.length) && !post.deleted) ||
+					// @pkuanvil: hardcode topic owner allow for now
+					post.display_moderator_tools;
 				post.ip = topicPrivileges.isAdminOrMod ? post.ip : undefined;
 
 				posts.modifyPostByPrivilege(post, topicPrivileges);
