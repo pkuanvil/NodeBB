@@ -4,6 +4,7 @@ const nconf = require('nconf');
 const validator = require('validator');
 const admin = require('./admin');
 const groups = require('../groups');
+const plugins = require('../plugins');
 
 const navigation = module.exports;
 
@@ -28,7 +29,13 @@ navigation.get = async function (uid) {
 		}
 		return await groups.isMemberOfAny(uid, navItem.groups);
 	}));
-	return data.filter((navItem, i) => pass[i]);
+	// @pkuanvil: add navigation hook
+	const navigations = data.filter((navItem, i) => pass[i]);
+	const hookResult = await plugins.hooks.fire('filter:pr_navigation.get', {
+		uid,
+		navigations,
+	});
+	return hookResult.navigations;
 };
 
 require('../promisify')(navigation);
